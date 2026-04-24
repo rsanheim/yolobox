@@ -134,7 +134,9 @@ yolobox also injects a managed guidance block into `~/.claude/CLAUDE.md` and `~/
 ## Config sync warning
 
 ::: warning
-Setting `claude_config = true`, `codex_config = true`, or `gemini_config = true` in config copies your host config on every container start. That can overwrite changes made inside the container, including auth and history. Prefer `--claude-config`, `--codex-config`, or `--gemini-config` for one-time syncs.
+Setting `claude_config = true`, `codex_config = true`, or `gemini_config = true` in config copies your host config on every container start. Claude and Gemini config sync replaces the matching in-container config directory, overwriting changes made inside the container. Codex config sync merges host files into `~/.codex` and preserves a valid in-container `auth.json` when the host copy has no usable auth file. Prefer `--claude-config`, `--codex-config`, or `--gemini-config` for one-time syncs.
 :::
 
 yolobox removes a zero-byte `/home/yolo/.codex/auth.json` during startup. Recent Codex versions fail with `EOF while parsing a value` when that stale file exists; removing it lets Codex recreate auth normally or show the sign-in flow.
+
+If Codex auth fails with `No space left on device`, the Docker or Podman storage backing `/home/yolo` or `/tmp` is full. Check `docker system df` or the equivalent for your runtime, then reclaim runtime storage or increase the VM disk size. yolobox warns at container startup when those paths are nearly full, but it does not automatically prune unrelated images, volumes, or build cache.

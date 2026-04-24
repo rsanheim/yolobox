@@ -116,3 +116,5 @@ Also update [README.md](README.md), the docs site under [docs/](docs/), and the 
 - Built-in agent guidance should be injected into `CLAUDE.md` and `AGENTS.md` as a managed block. Do not replace user instruction files outright just to teach agents about yolobox behavior.
 - The built-in yolobox skill must not infer readonly project state from `/output` existing. `/output` is present in the base image; check the manifest and actual project access instead.
 - A zero-byte `/home/yolo/.codex/auth.json` makes recent Codex CLIs abort with `EOF while parsing a value`. Repair that stale persistent-home state during entrypoint startup instead of requiring users to reset the volume.
+- Host Codex config import must preserve a valid existing container `/home/yolo/.codex/auth.json` when the host config has no usable auth file. Do not `rm -rf /home/yolo/.codex` before importing host Codex config.
+- Codex auth can report `No space left on device` when the Docker/Podman storage backing `/home/yolo` or `/tmp` is full after image pulls or builds. Warn clearly, but do not auto-prune unrelated runtime storage.

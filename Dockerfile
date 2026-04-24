@@ -263,6 +263,19 @@ RUN mkdir -p /host-claude /host-codex /host-gemini /host-git /host-agent-instruc
     '    /usr/local/bin/yolobox-upsert-block "$target" "$source_file" "$start_marker" "$end_marker"' \
     '    sudo chown yolo:yolo "$target"' \
     '}' \
+    'warn_low_space() {' \
+    '    local path="$1"' \
+    '    local label="$2"' \
+    '    local min_kb="${3:-65536}"' \
+    '    local available_kb' \
+    '    available_kb=$(df -Pk "$path" 2>/dev/null | awk "NR==2 {print \$4}")' \
+    '    if [ -n "$available_kb" ] && [ "$available_kb" -lt "$min_kb" ]; then' \
+    '        echo -e "\033[33m→ Low free space for $label (${available_kb}KB available); Codex auth and other CLI writes may fail with '\''No space left on device'\''\033[0m" >&2' \
+    '    fi' \
+    '}' \
+    '' \
+    'warn_low_space /home/yolo /home/yolo' \
+    'warn_low_space /tmp /tmp' \
     '' \
     '# Copy Claude config from host staging area if present' \
     'if [ -d /host-claude/.claude ] || [ -f /host-claude/.claude.json ] || [ -f "$HF/claude/.claude.json" ]; then' \
@@ -303,8 +316,16 @@ RUN mkdir -p /host-claude /host-codex /host-gemini /host-git /host-agent-instruc
     '# Copy Codex config from host staging area if present' \
     'if [ -d /host-codex/.codex ]; then' \
     '    echo -e "\033[33m→ Copying host Codex config to container\033[0m" >&2' \
-    '    sudo rm -rf /home/yolo/.codex' \
-    '    sudo cp -a /host-codex/.codex /home/yolo/.codex' \
+    '    CODEX_AUTH_BACKUP=""' \
+    '    if [ -s /home/yolo/.codex/auth.json ] && { [ ! -f /host-codex/.codex/auth.json ] || [ ! -s /host-codex/.codex/auth.json ]; }; then' \
+    '        CODEX_AUTH_BACKUP="/home/yolo/.codex/auth.json.yolobox-backup.$$"' \
+    '        sudo mv -f /home/yolo/.codex/auth.json "$CODEX_AUTH_BACKUP"' \
+    '    fi' \
+    '    mkdir -p /home/yolo/.codex' \
+    '    sudo cp -a /host-codex/.codex/. /home/yolo/.codex/' \
+    '    if [ -n "$CODEX_AUTH_BACKUP" ] && [ -s "$CODEX_AUTH_BACKUP" ]; then' \
+    '        sudo mv -f "$CODEX_AUTH_BACKUP" /home/yolo/.codex/auth.json' \
+    '    fi' \
     '    sudo chown -R yolo:yolo /home/yolo/.codex' \
     'fi' \
     'if [ -f /home/yolo/.codex/auth.json ] && [ ! -s /home/yolo/.codex/auth.json ]; then' \

@@ -734,6 +734,38 @@ func TestBuildRunArgsCodexConfig(t *testing.T) {
 	}
 }
 
+func TestDockerfileCodexConfigImportPreservesAuth(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read Dockerfile: %v", err)
+	}
+	dockerfile := string(data)
+	start := strings.Index(dockerfile, "'# Copy Codex config from host staging area if present'")
+	if start < 0 {
+		t.Fatal("failed to find Codex config import block")
+	}
+	rest := dockerfile[start:]
+	end := strings.Index(rest, "'# Copy git config from host staging area if present'")
+	if end < 0 {
+		t.Fatal("failed to find end of Codex config import block")
+	}
+	block := rest[:end]
+
+	if strings.Contains(block, "rm -rf /home/yolo/.codex") {
+		t.Fatal("Codex config import must not delete the existing container config directory")
+	}
+	for _, want := range []string{
+		"CODEX_AUTH_BACKUP",
+		"sudo mv -f /home/yolo/.codex/auth.json",
+		"sudo cp -a /host-codex/.codex/. /home/yolo/.codex/",
+		"sudo mv -f \"$CODEX_AUTH_BACKUP\" /home/yolo/.codex/auth.json",
+	} {
+		if !strings.Contains(block, want) {
+			t.Fatalf("expected Codex config import block to contain %q", want)
+		}
+	}
+}
+
 func TestBuildRunArgsRootlessPodmanPersistentVolumes(t *testing.T) {
 	runtimeDir := t.TempDir()
 	podmanPath := filepath.Join(runtimeDir, "podman")
