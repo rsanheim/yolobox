@@ -563,11 +563,21 @@ func TestDescribeYoloboxContextFallbackUsesProjectAccessBeforeOutputPath(t *test
 func yoloboxSkillContextScriptPath(t *testing.T) string {
 	t.Helper()
 
+	var candidates []string
 	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("failed to locate test file")
+	if ok {
+		candidates = append(candidates, filepath.Join(filepath.Dir(file), "..", "..", "skills", "yolobox", "scripts", "describe-yolobox-context.sh"))
 	}
-	return filepath.Join(filepath.Dir(file), "..", "..", "skills", "yolobox", "scripts", "describe-yolobox-context.sh")
+	if wd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, filepath.Join(wd, "..", "..", "skills", "yolobox", "scripts", "describe-yolobox-context.sh"))
+	}
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	t.Fatalf("failed to locate yolobox context script; tried: %s", strings.Join(candidates, ", "))
+	return ""
 }
 
 func TestBuildRunArgsContextManifestAppleRuntime(t *testing.T) {
