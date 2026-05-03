@@ -251,6 +251,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  --gh-token            Forward GitHub CLI token (from gh auth token)")
 	fmt.Fprintln(os.Stderr, "  --copy-agent-instructions  Copy global agent instructions and skills")
 	fmt.Fprintln(os.Stderr, "  --docker              Mount Docker socket and join shared network")
+	fmt.Fprintln(os.Stderr, "  --clipboard           Bridge text clipboard copy/paste to the host")
 	fmt.Fprintln(os.Stderr, "  --cpus <count>        Limit number of CPUs (supports fractions)")
 	fmt.Fprintln(os.Stderr, "  --memory <size>       Cap memory usage (e.g., 4g, 512m)")
 	fmt.Fprintln(os.Stderr, "  --shm-size <size>     Size of /dev/shm (e.g., 1g for Playwright)")
@@ -311,6 +312,7 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 		ghToken               bool
 		copyAgentInstructions bool
 		docker                bool
+		clipboard             bool
 		setup                 bool
 		mounts                stringSliceFlag
 		excludes              stringSliceFlag
@@ -347,6 +349,7 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 	fs.BoolVar(&ghToken, "gh-token", false, "forward GitHub CLI token (from gh auth token)")
 	fs.BoolVar(&copyAgentInstructions, "copy-agent-instructions", false, "copy agent instruction files and skills (CLAUDE.md, ~/.claude/skills, GEMINI.md, AGENTS.md, ~/.codex/skills)")
 	fs.BoolVar(&docker, "docker", false, "mount Docker socket and join shared network")
+	fs.BoolVar(&clipboard, "clipboard", false, "bridge text clipboard copy/paste to the host")
 	fs.BoolVar(&setup, "setup", false, "run interactive setup before starting")
 	fs.Var(&mounts, "mount", "extra mount src:dst")
 	fs.Var(&excludes, "exclude", "hide matching project paths from the container")
@@ -422,6 +425,9 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 	if docker {
 		cfg.Docker = true
 	}
+	if clipboard {
+		cfg.Clipboard = true
+	}
 	if setup {
 		cfg.Setup = true
 	}
@@ -496,6 +502,9 @@ func validateConfigConflicts(cfg Config) error {
 	}
 	if cfg.Docker && cfg.NoNetwork {
 		return fmt.Errorf("cannot use --docker with --no-network")
+	}
+	if cfg.Clipboard && cfg.NoNetwork {
+		return fmt.Errorf("cannot use --clipboard with --no-network")
 	}
 	if cfg.Pod != "" {
 		if cfg.Network != "" {
@@ -643,6 +652,18 @@ func runCommand(cfg Config, command []string, interactive bool) error {
 	// Warn if Docker has low memory (can cause OOM with Claude)
 	checkDockerMemory(cfg.Runtime)
 
+	var clipboard *clipboardBridge
+	if cfg.Clipboard {
+		clipboard, err = startClipboardBridge(cfg.Runtime)
+		if err != nil {
+			return err
+		}
+		defer clipboard.Close()
+		cfg.ClipboardEndpoint = clipboard.Endpoint
+		cfg.ClipboardToken = clipboard.Token
+		info("Host clipboard bridge enabled")
+	}
+
 	// Ensure Docker network exists before starting container
 	if cfg.Docker {
 		networkName := cfg.Network
@@ -763,6 +784,9 @@ func runSetup() (Config, error) {
 	if cfg.Docker {
 		selectedOptions = append(selectedOptions, "docker")
 	}
+	if cfg.Clipboard {
+		selectedOptions = append(selectedOptions, "clipboard")
+	}
 
 	// Print header with box
 	headerStyle := lipgloss.NewStyle().
@@ -785,7 +809,8 @@ func runSetup() (Config, error) {
 					huh.NewOption("GitHub CLI token (forward gh auth)", "gh_token"),
 					huh.NewOption("SSH agent (for git over SSH)", "ssh_agent"),
 					huh.NewOption("Docker socket (run containers from sandbox)", "docker"),
-					huh.NewOption("No network (disable internet access)", "no_network"),
+					huh.NewOption("Host clipboard (text copy/paste bridge; requires network)", "clipboard"),
+					huh.NewOption("No network (disables network, pod, Docker, and clipboard)", "no_network"),
 					huh.NewOption("No YOLO (disable auto-confirm in AI CLIs)", "no_yolo"),
 				).
 				Value(&selectedOptions),
@@ -859,6 +884,7 @@ func runSetup() (Config, error) {
 	cfg.GhToken = contains(selectedOptions, "gh_token")
 	cfg.SSHAgent = contains(selectedOptions, "ssh_agent")
 	cfg.Docker = contains(selectedOptions, "docker")
+	cfg.Clipboard = contains(selectedOptions, "clipboard")
 	cfg.NoNetwork = contains(selectedOptions, "no_network")
 	cfg.NoYolo = contains(selectedOptions, "no_yolo")
 	cfg.Pod = strings.TrimSpace(podName)
@@ -915,7 +941,8 @@ func splitToolArgs(args []string) (yoloboxArgs, toolArgs []string) {
 		"no-yolo": true, "scratch": true, "claude-config": true,
 		"codex-config": true, "gemini-config": true, "git-config": true, "gh-token": true,
 		"copy-agent-instructions": true, "docker": true, "setup": true, "mount": true,
-		"exclude": true, "copy-as": true,
+		"clipboard": true,
+		"exclude":   true, "copy-as": true,
 		"env": true, "h": true, "help": true,
 		"cpus": true, "memory": true, "shm-size": true, "gpus": true,
 		"device": true, "cap-add": true, "cap-drop": true, "runtime-arg": true,
@@ -1004,6 +1031,8 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 	stdoutTTY := term.IsTerminal(int(os.Stdout.Fd()))
 	if shouldAttachTTY(command, interactive, stdinTTY, stdoutTTY) {
 		args = append(args, "-it")
+	} else if !stdinTTY {
+		args = append(args, "-i")
 	}
 
 	args = append(args, "-w", absProject)
@@ -1024,6 +1053,14 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 
 	if cfg.NoYolo {
 		args = append(args, "-e", "NO_YOLO=1")
+	}
+	if cfg.Clipboard {
+		args = append(args,
+			"-e", "YOLOBOX_CLIPBOARD=1",
+			"-e", "YOLOBOX_CLIPBOARD_ENDPOINT="+cfg.ClipboardEndpoint,
+			"-e", "YOLOBOX_CLIPBOARD_TOKEN="+cfg.ClipboardToken,
+		)
+		args = append(args, clipboardRuntimeArgs(cfg.Runtime)...)
 	}
 	if termEnv := os.Getenv("TERM"); termEnv != "" {
 		args = append(args, "-e", "TERM="+termEnv)

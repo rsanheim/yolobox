@@ -17,8 +17,9 @@ git_config = true
 gh_token = true
 ssh_agent = true
 docker = true
-no_network = true
+clipboard = true
 network = "my_compose_network"
+# no_network = true # incompatible with network, pod, docker, and clipboard
 no_yolo = true
 cpus = "4"
 memory = "8g"
@@ -85,6 +86,12 @@ Each `runtime_args` entry is a single CLI argument. For flags that take a value,
 ```toml
 runtime_args = ["--security-opt", "seccomp=unconfined"]
 ```
+
+## Host clipboard
+
+Set `clipboard = true` or pass `--clipboard` to bridge text clipboard copy/paste between the container and the host. yolobox starts a short-lived host proxy for the session and exposes clipboard command shims inside the container: `pbcopy`, `pbpaste`, `xclip`, `xsel`, `wl-copy`, and `wl-paste`.
+
+`clipboard = true` cannot be combined with `no_network = true`.
 
 ## Global agent instructions {#global-agent-instructions}
 

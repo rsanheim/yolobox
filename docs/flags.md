@@ -6,55 +6,56 @@ Flags go after the subcommand: `yolobox run --flag cmd` or `yolobox claude --fla
 
 ## Runtime & image
 
-| Flag | Description |
-|------|-------------|
-| `--runtime <name>` | Use `docker`, `podman`, or `container` |
-| `--image <name>` | Override the base image |
-| `--packages <list>` | Comma-separated apt packages for a derived custom image |
-| `--customize-file <path>` | Dockerfile fragment for a derived custom image |
-| `--rebuild-image` | Force rebuild of the derived custom image |
+| Flag | Description | Incompatible with |
+|------|-------------|-------------------|
+| `--runtime <name>` | Use `docker`, `podman`, or `container` | |
+| `--image <name>` | Override the base image | |
+| `--packages <list>` | Comma-separated apt packages for a derived custom image | Apple `container` |
+| `--customize-file <path>` | Dockerfile fragment for a derived custom image | Apple `container` |
+| `--rebuild-image` | Force rebuild of the derived custom image | Apple `container` |
 
 ## Filesystem, config, and identity
 
-| Flag | Description |
-|------|-------------|
-| `--mount <src:dst>` | Extra mount, repeatable |
-| `--exclude <glob>` | Hide matching project paths from the container, repeatable |
-| `--copy-as <src:dst>` | Mount a file at another project path inside the container, repeatable |
-| `--env <KEY=val>` | Extra environment variable, repeatable |
-| `--setup` | Run interactive setup before starting |
-| `--ssh-agent` | Forward SSH agent socket |
-| `--readonly-project` | Mount the project read-only and write outputs to `/output` |
-| `--claude-config` | Copy host `~/.claude` config into the container |
-| `--codex-config` | Copy host `~/.codex` config into the container |
-| `--gemini-config` | Copy host `~/.gemini` config into the container |
-| `--git-config` | Copy host `~/.gitconfig` into the container |
-| `--gh-token` | Forward GitHub CLI token from `gh auth token` |
-| `--copy-agent-instructions` | Copy global instruction files and skills into the container |
+| Flag | Description | Incompatible with |
+|------|-------------|-------------------|
+| `--mount <src:dst>` | Extra mount, repeatable | |
+| `--exclude <glob>` | Hide matching project paths from the container, repeatable | Apple `container`, without `--readonly-project` |
+| `--copy-as <src:dst>` | Mount a file at another project path inside the container, repeatable | Apple `container`, without `--readonly-project` |
+| `--env <KEY=val>` | Extra environment variable, repeatable | |
+| `--setup` | Run interactive setup before starting | |
+| `--ssh-agent` | Forward SSH agent socket | |
+| `--readonly-project` | Mount the project read-only and write outputs to `/output` | |
+| `--claude-config` | Copy host `~/.claude` config into the container | |
+| `--codex-config` | Copy host `~/.codex` config into the container | |
+| `--gemini-config` | Copy host `~/.gemini` config into the container | |
+| `--git-config` | Copy host `~/.gitconfig` into the container | |
+| `--gh-token` | Forward GitHub CLI token from `gh auth token` | |
+| `--copy-agent-instructions` | Copy global instruction files and skills into the container | |
+| `--clipboard` | Bridge text clipboard copy/paste between the container and host | `--no-network` |
 
 ## Networking and behavior
 
-| Flag | Description |
-|------|-------------|
-| `--no-network` | Disable network access |
-| `--network <name>` | Join a specific network |
-| `--pod <name>` | Join an existing Podman pod |
-| `--no-yolo` | Disable auto-confirmations |
-| `--scratch` | Start with a fresh home and cache |
-| `--docker` | Mount the Docker socket and join the shared `yolobox-net` network |
+| Flag | Description | Incompatible with |
+|------|-------------|-------------------|
+| `--no-network` | Disable network access | `--network`, `--pod`, `--docker`, `--clipboard` |
+| `--network <name>` | Join a specific network | `--no-network`, `--pod` |
+| `--pod <name>` | Join an existing Podman pod | `--no-network`, `--network`, `--docker` |
+| `--no-yolo` | Disable auto-confirmations | |
+| `--scratch` | Start with a fresh home and cache | |
+| `--docker` | Mount the Docker socket and join the shared `yolobox-net` network | `--no-network`, `--pod` |
 
 ## Resources and low-level runtime control
 
-| Flag | Description |
-|------|-------------|
-| `--cpus <num>` | Limit CPUs, including fractional values like `3.5` |
-| `--memory <limit>` | Hard memory limit like `8g` or `1024m` |
-| `--shm-size <size>` | Size of `/dev/shm` |
-| `--gpus <spec>` | Pass GPUs, for example `all` or `device=0` |
-| `--device <src:dest>` | Add host devices, repeatable |
-| `--cap-add <cap>` | Add Linux capabilities, repeatable |
-| `--cap-drop <cap>` | Drop Linux capabilities, repeatable |
-| `--runtime-arg <flag>` | Pass raw runtime flags directly to Docker or Podman |
+| Flag | Description | Incompatible with |
+|------|-------------|-------------------|
+| `--cpus <num>` | Limit CPUs, including fractional values like `3.5` | |
+| `--memory <limit>` | Hard memory limit like `8g` or `1024m` | |
+| `--shm-size <size>` | Size of `/dev/shm` | |
+| `--gpus <spec>` | Pass GPUs, for example `all` or `device=0` | |
+| `--device <src:dest>` | Add host devices, repeatable | |
+| `--cap-add <cap>` | Add Linux capabilities, repeatable | |
+| `--cap-drop <cap>` | Drop Linux capabilities, repeatable | |
+| `--runtime-arg <flag>` | Pass raw runtime flags directly to Docker or Podman | |
 
 ## SSH agent on macOS
 
@@ -83,6 +84,16 @@ The network name is available inside the container as `$YOLOBOX_NETWORK`.
 
 ::: warning
 `--docker` cannot be combined with `--no-network`.
+:::
+
+## Host clipboard
+
+The `--clipboard` flag starts a short-lived host proxy and exposes text clipboard command shims inside the container: `pbcopy`, `pbpaste`, `xclip`, `xsel`, `wl-copy`, and `wl-paste`.
+
+This makes text copy/paste operations from tools such as Codex and Claude Code reach the host clipboard.
+
+::: warning
+`--clipboard` cannot be combined with `--no-network`, and it intentionally creates a host-write channel from inside the container.
 :::
 
 ## Project file filtering

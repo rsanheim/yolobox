@@ -35,6 +35,7 @@ type Config struct {
 	GhToken               bool     `toml:"gh_token"`
 	CopyAgentInstructions bool     `toml:"copy_agent_instructions"`
 	Docker                bool     `toml:"docker"`
+	Clipboard             bool     `toml:"clipboard"`
 
 	CPUs        string          `toml:"cpus"`
 	Memory      string          `toml:"memory"`
@@ -48,6 +49,9 @@ type Config struct {
 
 	Setup        bool `toml:"-"`
 	RebuildImage bool `toml:"-"`
+
+	ClipboardEndpoint string `toml:"-"`
+	ClipboardToken    string `toml:"-"`
 }
 
 func defaultConfig() Config {
@@ -178,6 +182,9 @@ func mergeConfig(dst *Config, src Config) {
 	if src.Docker {
 		dst.Docker = true
 	}
+	if src.Clipboard {
+		dst.Clipboard = true
+	}
 
 	if src.CPUs != "" {
 		dst.CPUs = src.CPUs
@@ -233,6 +240,7 @@ func printConfig(cfg Config) error {
 	fmt.Printf("%sgh_token:%s %t\n", colorBold, colorReset, cfg.GhToken)
 	fmt.Printf("%scopy_agent_instructions:%s %t\n", colorBold, colorReset, cfg.CopyAgentInstructions)
 	fmt.Printf("%sdocker:%s %t\n", colorBold, colorReset, cfg.Docker)
+	fmt.Printf("%sclipboard:%s %t\n", colorBold, colorReset, cfg.Clipboard)
 
 	printStringConfigField("cpus", cfg.CPUs)
 	printStringConfigField("memory", cfg.Memory)
@@ -322,6 +330,9 @@ func saveGlobalConfig(cfg Config) error {
 	}
 	if cfg.Docker {
 		lines = append(lines, "docker = true")
+	}
+	if cfg.Clipboard {
+		lines = append(lines, "clipboard = true")
 	}
 	if cfg.Pod != "" {
 		lines = append(lines, fmt.Sprintf("pod = %q", cfg.Pod))

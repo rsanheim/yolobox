@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"golang.org/x/term"
 )
 
 func argEnvValue(args []string, key string) (string, bool) {
@@ -44,6 +46,7 @@ func TestMergeConfig(t *testing.T) {
 		NoNetwork:   true,
 		Scratch:     true,
 		CodexConfig: true,
+		Clipboard:   true,
 	}
 
 	mergeConfig(&dst, src)
@@ -65,6 +68,9 @@ func TestMergeConfig(t *testing.T) {
 	}
 	if !dst.CodexConfig {
 		t.Error("expected CodexConfig to be true")
+	}
+	if !dst.Clipboard {
+		t.Error("expected Clipboard to be true")
 	}
 }
 
@@ -164,6 +170,30 @@ func TestLoadConfigCodexConfig(t *testing.T) {
 	}
 	if !cfg.CodexConfig {
 		t.Fatal("expected codex_config to load from config file")
+	}
+}
+
+func TestLoadConfigClipboard(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	globalConfigPath := filepath.Join(globalConfigDir, "config.toml")
+	if err := os.WriteFile(globalConfigPath, []byte("clipboard = true\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	cfg, err := loadConfig(projectDir)
+	if err != nil {
+		t.Fatalf("loadConfig failed: %v", err)
+	}
+	if !cfg.Clipboard {
+		t.Fatal("expected clipboard to load from config file")
 	}
 }
 
@@ -392,11 +422,14 @@ func TestBuildRunArgsContextManifestContents(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "test-key")
 
 	cfg := Config{
-		Image:           "test-image",
-		Env:             []string{"FOO=bar", "SUPER_SECRET=do-not-leak", "DEBUG"},
-		ReadonlyProject: true,
-		NoYolo:          true,
-		Network:         "devnet",
+		Image:             "test-image",
+		Env:               []string{"FOO=bar", "SUPER_SECRET=do-not-leak", "DEBUG"},
+		ReadonlyProject:   true,
+		NoYolo:            true,
+		Clipboard:         true,
+		ClipboardEndpoint: "http://host.docker.internal:12345",
+		ClipboardToken:    "test-token",
+		Network:           "devnet",
 		Customize: CustomizeConfig{
 			Packages:   []string{"jq"},
 			Dockerfile: ".yolobox.Dockerfile",
@@ -475,6 +508,9 @@ func TestBuildRunArgsContextManifestContents(t *testing.T) {
 	}
 	if manifest.Config.Network != "devnet" {
 		t.Fatalf("expected network devnet, got %s", manifest.Config.Network)
+	}
+	if !manifest.Config.Clipboard {
+		t.Fatal("expected clipboard in manifest config")
 	}
 	if !reflect.DeepEqual(manifest.Config.Customize.Packages, []string{"jq"}) {
 		t.Fatalf("unexpected customize packages: %v", manifest.Config.Customize.Packages)
@@ -976,6 +1012,9 @@ func TestBuildRunArgsNonInteractive(t *testing.T) {
 	argsStr := strings.Join(args, " ")
 	if strings.Contains(argsStr, "-it") {
 		t.Error("expected no -it flag for non-interactive mode")
+	}
+	if !term.IsTerminal(int(os.Stdin.Fd())) && !strings.Contains(argsStr, "-i") {
+		t.Error("expected -i flag when non-interactive test stdin is not a terminal")
 	}
 }
 
@@ -1827,6 +1866,52 @@ func TestParseFlagsCodexConfig(t *testing.T) {
 		t.Fatal("expected CodexConfig to be true after parsing --codex-config")
 	}
 	expectSliceEqual(t, rest, []string{"codex", "--version"})
+}
+
+func TestParseFlagsClipboard(t *testing.T) {
+	cfg, rest, err := parseBaseFlags("run", []string{"--clipboard", "codex", "--version"}, t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.Clipboard {
+		t.Fatal("expected Clipboard to be true after parsing --clipboard")
+	}
+	expectSliceEqual(t, rest, []string{"codex", "--version"})
+}
+
+func TestValidateClipboardNoNetworkConflict(t *testing.T) {
+	err := validateConfigConflicts(Config{Clipboard: true, NoNetwork: true})
+	if err == nil {
+		t.Fatal("expected clipboard/no-network conflict")
+	}
+	if !strings.Contains(err.Error(), "--clipboard") {
+		t.Fatalf("expected clipboard error, got %v", err)
+	}
+}
+
+func TestBuildRunArgsClipboard(t *testing.T) {
+	cfg := Config{
+		Image:             "test-image",
+		Clipboard:         true,
+		ClipboardEndpoint: "http://host.docker.internal:12345",
+		ClipboardToken:    "test-token",
+	}
+
+	args, _, err := buildRunArgs(cfg, "/test/project", []string{"bash"}, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	argsStr := strings.Join(args, " ")
+	for _, want := range []string{
+		"YOLOBOX_CLIPBOARD=1",
+		"YOLOBOX_CLIPBOARD_ENDPOINT=http://host.docker.internal:12345",
+		"YOLOBOX_CLIPBOARD_TOKEN=test-token",
+	} {
+		if !strings.Contains(argsStr, want) {
+			t.Fatalf("expected %s in args: %s", want, argsStr)
+		}
+	}
 }
 
 func TestBuildRunArgsTimezone(t *testing.T) {

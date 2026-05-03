@@ -54,6 +54,12 @@ Join an existing Docker network:
 yolobox run --network my-compose_default sh -lc 'getent hosts db'
 ```
 
+Bridge text clipboard copy/paste to the host:
+
+```bash
+yolobox codex --clipboard
+```
+
 ## Context handoff to the inside agent
 
 Every session provides a manifest at `/run/yolobox/context.json` and exports `YOLOBOX_CONTEXT_FILE`.

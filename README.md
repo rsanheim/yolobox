@@ -181,8 +181,9 @@ git_config = true
 gh_token = true
 ssh_agent = true
 docker = true
-no_network = true
+clipboard = true
 network = "my_compose_network"
+# no_network = true # incompatible with network, pod, docker, and clipboard
 no_yolo = true
 cpus = "4"
 memory = "8g"
@@ -290,40 +291,41 @@ Both skills follow the standard Agent Skills layout so they can be validated and
 
 > **Note:** Flags go **after** the subcommand: `yolobox run --flag cmd` or `yolobox claude --flag`, not `yolobox --flag run cmd`.
 
-| Flag | Description |
-|------|-------------|
-| `--runtime <name>` | Use `docker`, `podman`, or `container` (Apple) |
-| `--image <name>` | Custom base image |
-| `--mount <src:dst>` | Extra mount (repeatable) |
-| `--exclude <glob>` | Hide matching project paths from the container (repeatable) |
-| `--copy-as <src:dst>` | Mount a file at another project path inside the container (repeatable) |
-| `--env <KEY=val>` | Set environment variable (repeatable) |
-| `--setup` | Run interactive setup before starting |
-| `--ssh-agent` | Forward SSH agent socket |
-| `--no-network` | Disable network access |
-| `--network <name>` | Join specific network (e.g., docker compose) |
-| `--pod <name>` | Join existing Podman pod (shares its network) |
-| `--no-yolo` | Disable auto-confirmations (mindful mode) |
-| `--scratch` | Start with a fresh home/cache (nothing persists) |
-| `--readonly-project` | Mount project read-only (outputs go to `/output`) |
-| `--claude-config` | Copy host `~/.claude` config into container |
-| `--codex-config` | Copy host `~/.codex` config into container |
-| `--gemini-config` | Copy host `~/.gemini` config into container |
-| `--git-config` | Copy host `~/.gitconfig` into container |
-| `--gh-token` | Forward GitHub CLI token (extracts from keychain via `gh auth token`) |
-| `--copy-agent-instructions` | Copy global agent instruction files and skills (see configuration below) |
-| `--docker` | Mount Docker socket and join shared network (see notes below) |
-| `--cpus <num>` | Limit CPUs available to the container (accepts fractions like `3.5`) |
-| `--memory <limit>` | Hard memory limit (e.g., `8g`, `1024m`) |
-| `--shm-size <size>` | Size of `/dev/shm` tmpfs (useful for browsers/playwright) |
-| `--gpus <spec>` | Pass GPUs (Docker/Podman notation, e.g., `all`, `device=0`) |
-| `--device <src:dest>` | Add host devices in the container (repeatable) |
-| `--cap-add <cap>` | Add Linux capabilities (repeatable) |
-| `--cap-drop <cap>` | Drop Linux capabilities (repeatable) |
-| `--runtime-arg <flag>` | Pass raw runtime flags directly to Docker/Podman (repeatable) |
-| `--packages <list>` | Comma-separated apt packages for a derived custom image |
-| `--customize-file <path>` | Dockerfile fragment for a derived custom image |
-| `--rebuild-image` | Force rebuild of the derived custom image |
+| Flag | Description | Incompatible with |
+|------|-------------|-------------------|
+| `--runtime <name>` | Use `docker`, `podman`, or `container` (Apple) | |
+| `--image <name>` | Custom base image | |
+| `--mount <src:dst>` | Extra mount (repeatable) | |
+| `--exclude <glob>` | Hide matching project paths from the container (repeatable) | Apple `container`, without `--readonly-project` |
+| `--copy-as <src:dst>` | Mount a file at another project path inside the container (repeatable) | Apple `container`, without `--readonly-project` |
+| `--env <KEY=val>` | Set environment variable (repeatable) | |
+| `--setup` | Run interactive setup before starting | |
+| `--ssh-agent` | Forward SSH agent socket | |
+| `--no-network` | Disable network access | `--network`, `--pod`, `--docker`, `--clipboard` |
+| `--network <name>` | Join specific network (e.g., docker compose) | `--no-network`, `--pod` |
+| `--pod <name>` | Join existing Podman pod (shares its network) | `--no-network`, `--network`, `--docker` |
+| `--no-yolo` | Disable auto-confirmations (mindful mode) | |
+| `--scratch` | Start with a fresh home/cache (nothing persists) | |
+| `--readonly-project` | Mount project read-only (outputs go to `/output`) | |
+| `--claude-config` | Copy host `~/.claude` config into container | |
+| `--codex-config` | Copy host `~/.codex` config into container | |
+| `--gemini-config` | Copy host `~/.gemini` config into container | |
+| `--git-config` | Copy host `~/.gitconfig` into container | |
+| `--gh-token` | Forward GitHub CLI token (extracts from keychain via `gh auth token`) | |
+| `--copy-agent-instructions` | Copy global agent instruction files and skills (see configuration below) | |
+| `--docker` | Mount Docker socket and join shared network (see notes below) | `--no-network`, `--pod` |
+| `--clipboard` | Bridge text clipboard copy/paste between the container and host | `--no-network` |
+| `--cpus <num>` | Limit CPUs available to the container (accepts fractions like `3.5`) | |
+| `--memory <limit>` | Hard memory limit (e.g., `8g`, `1024m`) | |
+| `--shm-size <size>` | Size of `/dev/shm` tmpfs (useful for browsers/playwright) | |
+| `--gpus <spec>` | Pass GPUs (Docker/Podman notation, e.g., `all`, `device=0`) | |
+| `--device <src:dest>` | Add host devices in the container (repeatable) | |
+| `--cap-add <cap>` | Add Linux capabilities (repeatable) | |
+| `--cap-drop <cap>` | Drop Linux capabilities (repeatable) | |
+| `--runtime-arg <flag>` | Pass raw runtime flags directly to Docker/Podman (repeatable) | |
+| `--packages <list>` | Comma-separated apt packages for a derived custom image | Apple `container` |
+| `--customize-file <path>` | Dockerfile fragment for a derived custom image | Apple `container` |
+| `--rebuild-image` | Force rebuild of the derived custom image | Apple `container` |
 
 > **Resource & security controls:** The table lists the common knobs baked into yolobox. Anything else (e.g., `--ulimit nofile=4096:8192`, `--security-opt seccomp=unconfined`) can be forwarded verbatim with `--runtime-arg <flag>` as many times as needed. Docker and Podman accept the passthrough flags unchanged; Apple's `container` runtime ignores options it doesn't understand.
 
@@ -331,7 +333,9 @@ Both skills follow the standard Agent Skills layout so they can be validated and
 
 > **Networking:** By default, yolobox uses Docker's bridge network (internet access, no container DNS). Use `--network <name>` to join a docker compose network and access services by name. Use `--no-network` for complete isolation.
 
-> **Docker access:** The `--docker` flag mounts the host Docker socket into the container and joins a shared `yolobox-net` network. This lets the AI agent run Docker commands (build images, start containers, use docker compose) that create sibling containers on the same network. The agent and any services it creates can communicate by container name. The network name is available inside the container as `$YOLOBOX_NETWORK`. Cannot be used with `--no-network`.
+> **Docker access:** The `--docker` flag mounts the host Docker socket into the container and joins a shared `yolobox-net` network. This lets the AI agent run Docker commands (build images, start containers, use docker compose) that create sibling containers on the same network. The agent and any services it creates can communicate by container name. The network name is available inside the container as `$YOLOBOX_NETWORK`.
+
+> **Clipboard bridge:** `--clipboard` starts a short-lived host proxy and exposes text clipboard command shims (`pbcopy`, `pbpaste`, `xclip`, `xsel`, `wl-copy`, `wl-paste`) inside the container.
 
 > **Project filtering:** `--exclude` globs are evaluated relative to the project root. `--copy-as` destinations must already exist as files in the project. Both flags currently require `--readonly-project`. Apple's `container` runtime does not support them yet.
 

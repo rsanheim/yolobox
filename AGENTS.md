@@ -15,6 +15,7 @@ Whenever behavior, UX, defaults, flags, docs, or built-in agent guidance change,
 - [README.md](README.md)
 - the docs site under [docs/](docs/)
 - the bundled skills under [skills/](skills/)
+- the setup command/wizard in [cmd/yolobox/main.go](cmd/yolobox/main.go)
 
 Do not stop at unit tests when behavior can be exercised for real. If a change affects runtime behavior, flags, mounts, image builds, config loading, or release automation, run the actual path and verify the output.
 
@@ -97,6 +98,7 @@ Also update [README.md](README.md), the docs site under [docs/](docs/), and the 
 - `install.sh` runs under `set -euo pipefail`, so any best-effort network probe must explicitly tolerate failure. Otherwise the release lookup exits the script before the source-build fallback can run.
 - Help text for auto-forwarded env vars must be generated from `autoPassthroughEnvVars`. Hardcoded copies drift and create auth debugging noise.
 - Allocating a container TTY (`-t`) merges stdout and stderr at the PTY boundary. Only enable TTY for genuinely interactive commands, or host-side redirection and piping will behave incorrectly.
+- Host-side stdin pipes need `docker run -i`/`podman run -i` even when no TTY is allocated. Keep `-i` separate from `-t` so piped data works without merging stdout and stderr.
 - Codex trust is separate from execution mode. `--ask-for-approval never` plus `--sandbox danger-full-access` still shows the trust prompt for a new directory, so verify trusted-project startup separately when changing Codex launch flags.
 - Any `sudo` re-exec path in the entrypoint must preserve `PATH` (for example `--preserve-env=PATH`) or `/opt/yolobox/bin` wrappers get bypassed and AI CLIs lose pinned yolo flags.
 - Avoid parallel Git commands in this repo while another Git operation is active. We have repeatedly hit misleading `.git/index.lock` failures from overlapping status/checkout/rebase calls.

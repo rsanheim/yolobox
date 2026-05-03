@@ -65,6 +65,7 @@ type contextConfigManifest struct {
 	GhToken               bool                           `json:"gh_token"`
 	CopyAgentInstructions bool                           `json:"copy_agent_instructions"`
 	Docker                bool                           `json:"docker"`
+	Clipboard             bool                           `json:"clipboard"`
 	CPUs                  string                         `json:"cpus"`
 	Memory                string                         `json:"memory"`
 	ShmSize               string                         `json:"shm_size"`
@@ -143,6 +144,7 @@ func buildContextManifest(cfg Config, projectDir string, command []string, inter
 			GhToken:               cfg.GhToken,
 			CopyAgentInstructions: cfg.CopyAgentInstructions,
 			Docker:                cfg.Docker,
+			Clipboard:             cfg.Clipboard,
 			CPUs:                  cfg.CPUs,
 			Memory:                cfg.Memory,
 			ShmSize:               cfg.ShmSize,
