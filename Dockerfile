@@ -220,6 +220,35 @@ RUN cp /opt/yolobox/wrapper-template /opt/yolobox/bin/copilot \
     && echo 'exec "$REAL_BIN" --yolo "$@"' >> /opt/yolobox/bin/copilot \
     && chmod +x /opt/yolobox/bin/copilot
 
+# GitHub HTTPS credential helper. When a GitHub token is forwarded into the
+# container, this lets ordinary Git commands authenticate to https://github.com
+# without depending on host-specific helpers such as macOS Keychain.
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'case "${1:-}" in' \
+    '    get) ;;' \
+    '    *) exit 0 ;;' \
+    'esac' \
+    'protocol=""' \
+    'host=""' \
+    'while IFS= read -r line; do' \
+    '    [ -z "$line" ] && break' \
+    '    case "$line" in' \
+    '        protocol=*) protocol=${line#protocol=} ;;' \
+    '        host=*) host=${line#host=} ;;' \
+    '    esac' \
+    'done' \
+    '[ "$protocol" = "https" ] || exit 0' \
+    '[ "$host" = "github.com" ] || exit 0' \
+    'token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"' \
+    '[ -n "$token" ] || exit 0' \
+    'printf "username=x-access-token\n"' \
+    'printf "password=%s\n" "$token"' \
+    > /opt/yolobox/bin/git-credential-github-token \
+    && chmod +x /opt/yolobox/bin/git-credential-github-token \
+    && git config --system --add credential.https://github.com.helper "" \
+    && git config --system --add credential.https://github.com.helper "!/opt/yolobox/bin/git-credential-github-token"
+
 # Built-in agent skills live outside /home/yolo so named volumes cannot hide them.
 COPY skills /opt/yolobox/skills
 COPY agent-instructions /opt/yolobox/agent-instructions

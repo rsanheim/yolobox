@@ -272,7 +272,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  --codex-config        Copy host Codex config to container")
 	fmt.Fprintln(os.Stderr, "  --gemini-config       Copy host Gemini config to container")
 	fmt.Fprintln(os.Stderr, "  --git-config          Copy host git config to container")
-	fmt.Fprintln(os.Stderr, "  --gh-token            Forward GitHub CLI token (from gh auth token)")
+	fmt.Fprintln(os.Stderr, "  --gh-token            Forward GitHub token for gh and HTTPS git")
 	fmt.Fprintln(os.Stderr, "  --copy-agent-instructions  Copy global agent instructions and skills")
 	fmt.Fprintln(os.Stderr, "  --docker              Mount Docker socket and join shared network")
 	fmt.Fprintln(os.Stderr, "  --clipboard           Bridge text clipboard copy/paste to the host")
@@ -832,7 +832,7 @@ func runSetup() (Config, error) {
 				Title("What do you want inside the box?").
 				Options(
 					huh.NewOption("Git identity (copy ~/.gitconfig)", "git_config"),
-					huh.NewOption("GitHub CLI token (forward gh auth)", "gh_token"),
+					huh.NewOption("GitHub token (gh + HTTPS git auth)", "gh_token"),
 					huh.NewOption("SSH agent (for git over SSH)", "ssh_agent"),
 					huh.NewOption("Docker socket (run containers from sandbox)", "docker"),
 					huh.NewOption("Host clipboard (text copy/paste bridge; requires network)", "clipboard"),

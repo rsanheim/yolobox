@@ -122,7 +122,7 @@ These are automatically passed into the container if they are set on the host:
 - `GEMINI_API_KEY`
 
 ::: tip macOS and GitHub tokens
-On macOS, `gh` stores tokens in Keychain, not environment variables. Use `--gh-token` or `gh_token = true` if you want yolobox to extract and forward the GitHub CLI token.
+On macOS, `gh` stores tokens in Keychain, not environment variables. Use `--gh-token` or `gh_token = true` if you want yolobox to extract and forward the GitHub token. When a token is present, yolobox also configures HTTPS Git auth for `github.com` remotes.
 :::
 
 ## Runtime context manifest

@@ -18,7 +18,7 @@ Use this skill only for questions about the current yolobox environment from ins
    - the project is mounted in, but host files outside the exposed mounts are out of reach by default
    - write access, output path, network access, Docker access, and forwarded env keys depend on the current manifest
    - if fork mode is active, this project is a copied folder mounted at the original source path and `COMPOSE_PROJECT_NAME` is namespaced for the fork
-5. Prefer concrete facts from `YOLOBOX_CONTEXT_FILE` over generic assumptions. Mention the current project path, workdir, runtime, readonly/output behavior, network mode, Docker socket access, SSH agent access, fork/Compose namespace if present, and any relevant env keys or customization settings. In the script output, `Readonly project mode` is the yolobox launch mode and `Project writable now` is the current filesystem write check.
+5. Prefer concrete facts from `YOLOBOX_CONTEXT_FILE` over generic assumptions. Mention the current project path, workdir, runtime, readonly/output behavior, network mode, Docker socket access, SSH agent access, GitHub token availability for HTTPS Git auth, fork/Compose namespace if present, and any relevant env keys or customization settings. In the script output, `Readonly project mode` is the yolobox launch mode and `Project writable now` is the current filesystem write check.
 6. If the script had to fall back to inference instead of the manifest, say so explicitly.
 7. If the user needs a specific field or the raw manifest, run `${CODEX_HOME:-$HOME/.codex}/skills/yolobox/scripts/describe-yolobox-context.sh --json` or query `$YOLOBOX_CONTEXT_FILE` directly with `jq`.
 8. Do not claim you are inside yolobox unless `YOLOBOX=1` or the manifest confirms it.

@@ -838,6 +838,26 @@ func TestDockerfileCodexConfigImportPreservesAuth(t *testing.T) {
 	}
 }
 
+func TestDockerfileConfiguresGitHubTokenCredentialHelper(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read Dockerfile: %v", err)
+	}
+	dockerfile := string(data)
+
+	for _, want := range []string{
+		"/opt/yolobox/bin/git-credential-github-token",
+		"credential.https://github.com.helper",
+		"GH_TOKEN",
+		"GITHUB_TOKEN",
+		"x-access-token",
+	} {
+		if !strings.Contains(dockerfile, want) {
+			t.Fatalf("expected Dockerfile to contain %q", want)
+		}
+	}
+}
+
 func TestBuildRunArgsRootlessPodmanPersistentVolumes(t *testing.T) {
 	runtimeDir := t.TempDir()
 	podmanPath := filepath.Join(runtimeDir, "podman")

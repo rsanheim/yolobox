@@ -306,7 +306,7 @@ For Claude and Codex, yolobox also injects a managed instruction block into `~/.
 
 Both skills follow the standard Agent Skills layout so they can be validated and published from this repo instead of being maintained as image-only one-offs.
 
-> **Note:** On macOS, `gh` CLI stores tokens in Keychain, not environment variables. Use `--gh-token` (or `gh_token = true` in config) to extract and forward your GitHub CLI token.
+> **Note:** On macOS, `gh` CLI stores tokens in Keychain, not environment variables. Use `--gh-token` (or `gh_token = true` in config) to extract and forward your GitHub token. When a token is present, yolobox also configures HTTPS Git auth for `github.com` remotes.
 
 ## Flags
 
@@ -332,7 +332,7 @@ Both skills follow the standard Agent Skills layout so they can be validated and
 | `--codex-config` | Copy host `~/.codex` config into container | |
 | `--gemini-config` | Copy host `~/.gemini` config into container | |
 | `--git-config` | Copy host `~/.gitconfig` into container | |
-| `--gh-token` | Forward GitHub CLI token (extracts from keychain via `gh auth token`) | |
+| `--gh-token` | Forward GitHub token for `gh` and HTTPS Git auth (extracts from keychain via `gh auth token`) | |
 | `--copy-agent-instructions` | Copy global agent instruction files and skills (see configuration below) | |
 | `--docker` | Mount Docker socket and join shared network (see notes below) | `--no-network`, `--pod` |
 | `--clipboard` | Bridge text clipboard copy/paste between the container and host | `--no-network` |

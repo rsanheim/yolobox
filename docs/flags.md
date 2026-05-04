@@ -29,7 +29,7 @@ Flags go after the subcommand: `yolobox run --flag cmd` or `yolobox claude --fla
 | `--codex-config` | Copy host `~/.codex` config into the container | |
 | `--gemini-config` | Copy host `~/.gemini` config into the container | |
 | `--git-config` | Copy host `~/.gitconfig` into the container | |
-| `--gh-token` | Forward GitHub CLI token from `gh auth token` | |
+| `--gh-token` | Forward GitHub token for `gh` and HTTPS Git auth from `gh auth token` | |
 | `--copy-agent-instructions` | Copy global instruction files and skills into the container | |
 | `--clipboard` | Bridge text clipboard copy/paste between the container and host | `--no-network` |
 

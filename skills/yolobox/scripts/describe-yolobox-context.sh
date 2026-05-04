@@ -103,6 +103,7 @@ if [[ -f "$context_file" ]] && command -v jq >/dev/null 2>&1; then
             (if .config.pod != "" then "Pod: " + .config.pod else empty end),
             "Docker socket: " + (.config.docker | tostring),
             "SSH agent: " + (.config.ssh_agent | tostring),
+            "GitHub token available: " + ((.launch.gh_token_forwarded or (((.launch.auto_passthrough_env_keys // []) | index("GH_TOKEN")) != null) or (((.launch.auto_passthrough_env_keys // []) | index("GITHUB_TOKEN")) != null)) | tostring),
             "Host clipboard: " + (.config.clipboard | tostring),
             "YOLO wrappers disabled: " + (.config.no_yolo | tostring),
             (if (.config.customize.packages | length) > 0 then "Customize packages: " + (.config.customize.packages | join(", ")) else empty end),
@@ -128,6 +129,7 @@ readonly_project="unknown"
 output_path=""
 docker_socket="false"
 ssh_agent="false"
+github_token="false"
 clipboard="false"
 
 if [[ "$project_writable" == "true" ]]; then
@@ -141,6 +143,9 @@ if [[ -S /var/run/docker.sock ]]; then
 fi
 if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
     ssh_agent="true"
+fi
+if [[ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]]; then
+    github_token="true"
 fi
 if [[ "${YOLOBOX_CLIPBOARD:-}" == "1" && -n "${YOLOBOX_CLIPBOARD_ENDPOINT:-}" ]]; then
     clipboard="true"
@@ -158,4 +163,5 @@ fi
 printf 'Readonly project mode: %s\n' "$readonly_project"
 printf 'Docker socket: %s\n' "$docker_socket"
 printf 'SSH agent: %s\n' "$ssh_agent"
+printf 'GitHub token available: %s\n' "$github_token"
 printf 'Host clipboard: %s\n' "$clipboard"
