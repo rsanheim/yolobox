@@ -38,6 +38,7 @@ type Config struct {
 	ClaudeConfig          bool     `toml:"claude_config"`
 	CodexConfig           bool     `toml:"codex_config"`
 	GeminiConfig          bool     `toml:"gemini_config"`
+	OpencodeConfig        bool     `toml:"opencode_config"`
 	GitConfig             bool     `toml:"git_config"`
 	GhToken               bool     `toml:"gh_token"`
 	CopyAgentInstructions bool     `toml:"copy_agent_instructions"`
@@ -178,6 +179,9 @@ func mergeConfig(dst *Config, src Config) {
 	if src.GeminiConfig {
 		dst.GeminiConfig = true
 	}
+	if src.OpencodeConfig {
+		dst.OpencodeConfig = true
+	}
 	if src.GitConfig {
 		dst.GitConfig = true
 	}
@@ -244,6 +248,7 @@ func printConfig(cfg Config) error {
 	fmt.Printf("%sclaude_config:%s %t\n", colorBold, colorReset, cfg.ClaudeConfig)
 	fmt.Printf("%scodex_config:%s %t\n", colorBold, colorReset, cfg.CodexConfig)
 	fmt.Printf("%sgemini_config:%s %t\n", colorBold, colorReset, cfg.GeminiConfig)
+	fmt.Printf("%sopencode_config:%s %t\n", colorBold, colorReset, cfg.OpencodeConfig)
 	fmt.Printf("%sgit_config:%s %t\n", colorBold, colorReset, cfg.GitConfig)
 	fmt.Printf("%sgh_token:%s %t\n", colorBold, colorReset, cfg.GhToken)
 	fmt.Printf("%scopy_agent_instructions:%s %t\n", colorBold, colorReset, cfg.CopyAgentInstructions)
@@ -314,6 +319,18 @@ func saveGlobalConfig(cfg Config) error {
 	var lines []string
 	if cfg.GitConfig {
 		lines = append(lines, "git_config = true")
+	}
+	if cfg.ClaudeConfig {
+		lines = append(lines, "claude_config = true")
+	}
+	if cfg.CodexConfig {
+		lines = append(lines, "codex_config = true")
+	}
+	if cfg.GeminiConfig {
+		lines = append(lines, "gemini_config = true")
+	}
+	if cfg.OpencodeConfig {
+		lines = append(lines, "opencode_config = true")
 	}
 	if cfg.GhToken {
 		lines = append(lines, "gh_token = true")
