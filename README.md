@@ -162,6 +162,7 @@ yolobox copilot             # Run GitHub Copilot
 # General commands
 yolobox                     # Drop into interactive shell (for manual use)
 yolobox run <cmd...>        # Run any command in sandbox
+yolobox fork --name <env> <cmd...> # Run in a named copied folder with a Compose namespace
 yolobox setup               # Configure yolobox settings
 yolobox upgrade             # Update binary and pull latest image
 yolobox config              # Show resolved configuration
@@ -169,6 +170,25 @@ yolobox reset --force       # Delete volumes (fresh start)
 yolobox version             # Show version
 yolobox help                # Show help
 ```
+
+## Fork Mode
+
+Use fork mode when you want several agents working beside you without competing for the same folder. Each fork gets its own complete copy of the current project folder, like another developer working on their own machine. If the folder contains a Git checkout, your Git remote becomes the sync point, just like it would for a team.
+
+```bash
+yolobox fork --name bruno codex
+yolobox fork --name diane claude
+yolobox fork resume bruno codex
+yolobox fork discard bruno --force
+```
+
+Fork mode copies the entire current folder to `../.yolobox-forks/<folder>/<env>`. That includes `.git` if present, ignored files, untracked files, env files, dependencies, local caches, and anything else in the folder. Inside the container, the copied folder is mounted at the original source path, while host filesystem writes land in the copy. Yolobox also sets `COMPOSE_PROJECT_NAME` to a unique value for the source folder and fork.
+
+On exit, yolobox runs best-effort `docker compose -p "$COMPOSE_PROJECT_NAME" down --volumes --remove-orphans` when it finds a Compose file. The copied folder is preserved until you explicitly discard it.
+
+Compose namespacing covers default Compose-created containers, networks, and named volumes. Fixed host ports, explicit `container_name`, external networks or volumes, and absolute bind mounts can still collide.
+
+See the [recipes](docs/recipes.md) for common fork workflows, including parallel agents on one project and webapp routing.
 
 ## Configuration
 
@@ -273,6 +293,7 @@ This gives agents and scripts a stable way to confirm they are inside yolobox an
 - configured and selected runtime
 - project, home, and output paths inside the container
 - launch command, working directory, and interactive mode
+- developer/environment name, copied folder path, source folder, and Compose project name when `yolobox fork` is active
 - resolved config fields such as network, mounts, readonly mode, Docker access, and customization settings
 - forwarded environment variable keys, without exposing their values
 

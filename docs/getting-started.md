@@ -75,6 +75,7 @@ yolobox claude --runtime container
 ## Next pages
 
 - [Commands](/commands): shortcut commands, shell usage, and maintenance commands
+- [Recipes](/recipes): named agent environments, Git remote synchronization, and webapp routing
 - [What's in the Box](/whats-in-the-box): preinstalled tools and YOLO-mode wrappers
 - [Project-Level Customization](/customizing): add packages or a Dockerfile fragment per project
 - [Configuration](/configuration): global defaults, project config, copied instructions, and auto-forwarded env vars

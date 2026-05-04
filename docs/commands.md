@@ -33,6 +33,9 @@ These launch the matching tool inside yolobox and apply the tool-specific YOLO-m
 ```bash
 yolobox                     # Open an interactive shell
 yolobox run <cmd...>        # Run a single command in the sandbox
+yolobox fork --name <env> <cmd...> # Run in a named copied folder with a Compose namespace
+yolobox fork resume <env> [cmd...] # Reopen an existing copied folder
+yolobox fork discard <env> --force # Delete a copied folder
 yolobox setup               # Write global defaults to ~/.config/yolobox/config.toml
 yolobox config              # Print the resolved config for the current project
 yolobox upgrade             # Update the binary and pull the latest base image
@@ -55,6 +58,26 @@ yolobox claude --docker --git-config --gh-token
 ```bash
 yolobox run --no-network --readonly-project python3 untrusted_script.py
 ```
+
+### Run parallel agents on one project
+
+```bash
+yolobox fork --name bruno codex
+yolobox fork --name diane claude
+```
+
+Fork mode gives each agent its own complete copy of the current project folder, like another developer working on their own machine. Instead of many agents competing on one machine and one folder, you get many named agent environments, each with its own folder and Docker Compose namespace. If the folder contains a Git checkout, use your Git remote as the sync point, just like you would with teammates.
+
+The copy lives at `../.yolobox-forks/<folder>/<env>` and is mounted inside the container at the original source path. Yolobox also sets a unique `COMPOSE_PROJECT_NAME`, so default Docker Compose containers, networks, and named volumes are namespaced by fork.
+
+When the fork exits, yolobox runs best-effort Compose cleanup if it finds a Compose file. The copied folder is preserved until you explicitly discard it:
+
+```bash
+yolobox fork resume bruno codex
+yolobox fork discard bruno --force
+```
+
+See [Recipes](/recipes) for common fork workflows, including webapp routing.
 
 ### Hide secrets from the sandboxed view
 
@@ -85,5 +108,7 @@ yolobox reset --force
 Use shortcut commands when you want an AI agent session.
 
 Use `run` when you want one exact command in the same sandbox model.
+
+Use `fork` when you want concurrent sessions on the same project folder without sharing files or the default Compose project namespace.
 
 Use the bare `yolobox` shell when you are debugging or exploring manually, not as the main path.

@@ -116,11 +116,16 @@ func runCmd() error {
 		return fmt.Errorf("failed to get working directory: %w", err)
 	}
 
+	return runCmdArgs(args, projectDir, nil)
+}
+
+func runCmdArgs(args []string, projectDir string, fork *ForkConfig) error {
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
 		cfg, rest, err := parseBaseFlags("yolobox", args, projectDir)
 		if err != nil {
 			return err
 		}
+		applyForkConfig(&cfg, fork)
 		if len(rest) != 0 {
 			return fmt.Errorf("unexpected args: %v\n  Hint: flags go after the subcommand: yolobox run --flag cmd (not yolobox --flag run cmd)", rest)
 		}
@@ -133,10 +138,13 @@ func runCmd() error {
 		if err != nil {
 			return err
 		}
+		applyForkConfig(&cfg, fork)
 		if len(rest) == 0 {
 			return fmt.Errorf("run requires a command")
 		}
 		return runCommand(cfg, rest, false)
+	case "fork":
+		return runFork(args[1:], projectDir)
 	case "setup":
 		_, err := runSetup()
 		return err
@@ -147,6 +155,7 @@ func runCmd() error {
 		if err != nil {
 			return err
 		}
+		applyForkConfig(&cfg, fork)
 		if len(rest) != 0 {
 			return fmt.Errorf("unexpected args: %v", rest)
 		}
@@ -175,6 +184,7 @@ func runCmd() error {
 			if err != nil {
 				return err
 			}
+			applyForkConfig(&cfg, fork)
 
 			// Combine any remaining args from flag parsing with tool args
 			allToolArgs := append(rest, toolArgs...)
@@ -187,6 +197,19 @@ func runCmd() error {
 		}
 		return fmt.Errorf("unknown command: %s (try 'yolobox help')\n  Hint: if using flags, put them after the subcommand: yolobox run --flag cmd", args[0])
 	}
+}
+
+func applyForkConfig(cfg *Config, fork *ForkConfig) {
+	if fork == nil || fork.Name == "" {
+		return
+	}
+	cfg.Fork = *fork
+	cfg.Env = append(cfg.Env,
+		"YOLOBOX_FORK_NAME="+fork.Name,
+		"YOLOBOX_FORK_SOURCE="+fork.Source,
+		"YOLOBOX_FORK_COPY="+fork.Copy,
+		"COMPOSE_PROJECT_NAME="+fork.ComposeProject,
+	)
 }
 
 func wrapCommaList(items []string, maxWidth int) []string {
@@ -216,6 +239,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "%sUSAGE:%s\n", colorBold, colorReset)
 	fmt.Fprintln(os.Stderr, "  yolobox                     Start interactive shell in sandbox")
 	fmt.Fprintln(os.Stderr, "  yolobox run <cmd...>        Run a command in sandbox")
+	fmt.Fprintln(os.Stderr, "  yolobox fork --name <env> <cmd>  Run in a named copied folder with Compose namespace")
 	fmt.Fprintln(os.Stderr, "  yolobox setup               Configure yolobox settings")
 	fmt.Fprintln(os.Stderr, "  yolobox upgrade             Upgrade binary and pull latest image")
 	fmt.Fprintln(os.Stderr, "  yolobox config              Print resolved configuration")
@@ -276,6 +300,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "%sEXAMPLES:%s\n", colorBold, colorReset)
 	fmt.Fprintln(os.Stderr, "  yolobox                     # Drop into a shell")
 	fmt.Fprintln(os.Stderr, "  yolobox run make build      # Run make inside sandbox")
+	fmt.Fprintln(os.Stderr, "  yolobox fork --name bruno codex  # Developer env + Compose namespace")
 	fmt.Fprintln(os.Stderr, "  yolobox run claude          # Run Claude Code in sandbox")
 	fmt.Fprintln(os.Stderr, "  yolobox --no-network        # Paranoid mode: no internet")
 	fmt.Fprintln(os.Stderr, "")
@@ -609,6 +634,7 @@ func runShell(cfg Config) error {
 			// mergeConfig applies cfg's non-zero values on top of newCfg,
 			// so CLI/config-file settings win and setup fills the gaps.
 			mergeConfig(&newCfg, cfg)
+			newCfg.Fork = cfg.Fork
 			cfg = newCfg
 		}
 	}
@@ -1002,6 +1028,13 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 	if err != nil {
 		return nil, nil, err
 	}
+	projectMountTarget := absProject
+	containerWorkingDir := absProject
+	if cfg.Fork.Name != "" {
+		absProject = cfg.Fork.Copy
+		projectMountTarget = cfg.Fork.Source
+		containerWorkingDir = cfg.Fork.Source
+	}
 
 	// cleanupPaths collects temp files/dirs created during arg building
 	// that should be removed after the container exits
@@ -1035,9 +1068,9 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 		args = append(args, "-i")
 	}
 
-	args = append(args, "-w", absProject)
+	args = append(args, "-w", containerWorkingDir)
 	args = append(args, "-e", "YOLOBOX=1")
-	args = append(args, "-e", "YOLOBOX_PROJECT_PATH="+absProject)
+	args = append(args, "-e", "YOLOBOX_PROJECT_PATH="+containerWorkingDir)
 
 	// Pass host UID/GID so the entrypoint can match the yolo user to the
 	// project directory owner (fixes virtiofs permission issues on Colima 0.10+).
@@ -1101,9 +1134,9 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 	}
 	cleanupPaths = append(cleanupPaths, overlayCleanupPaths...)
 
-	// Project mount at its real host path (for session continuity)
+	// Project mount at its real container path (for session continuity).
 	// A symlink /workspace -> real path is created by the entrypoint
-	projectMount := projectMountSource + ":" + absProject
+	projectMount := projectMountSource + ":" + projectMountTarget
 	if cfg.ReadonlyProject {
 		projectMount += ":ro"
 		// Create a writable output directory
@@ -1415,7 +1448,7 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 		}
 	}
 
-	contextPayload, err := encodeContextManifest(cfg, absProject, command, interactive, autoPassthroughEnvKeys, ghTokenForwarded)
+	contextPayload, err := encodeContextManifest(cfg, containerWorkingDir, command, interactive, autoPassthroughEnvKeys, ghTokenForwarded)
 	if err != nil {
 		return nil, nil, err
 	}

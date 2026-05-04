@@ -14,6 +14,13 @@ type CustomizeConfig struct {
 	Dockerfile string   `toml:"dockerfile"`
 }
 
+type ForkConfig struct {
+	Name           string `toml:"-"`
+	Source         string `toml:"-"`
+	Copy           string `toml:"-"`
+	ComposeProject string `toml:"-"`
+}
+
 type Config struct {
 	Runtime               string   `toml:"runtime"`
 	Image                 string   `toml:"image"`
@@ -47,8 +54,9 @@ type Config struct {
 	RuntimeArgs []string        `toml:"runtime_args"`
 	Customize   CustomizeConfig `toml:"customize"`
 
-	Setup        bool `toml:"-"`
-	RebuildImage bool `toml:"-"`
+	Setup        bool       `toml:"-"`
+	RebuildImage bool       `toml:"-"`
+	Fork         ForkConfig `toml:"-"`
 
 	ClipboardEndpoint string `toml:"-"`
 	ClipboardToken    string `toml:"-"`

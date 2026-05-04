@@ -20,6 +20,7 @@ type contextManifest struct {
 	Runtime        contextRuntime        `json:"runtime"`
 	Launch         contextLaunch         `json:"launch"`
 	Paths          contextPaths          `json:"paths"`
+	Fork           *contextFork          `json:"fork,omitempty"`
 	Config         contextConfigManifest `json:"config"`
 }
 
@@ -43,6 +44,13 @@ type contextPaths struct {
 	Project string `json:"project"`
 	Home    string `json:"home"`
 	Output  string `json:"output,omitempty"`
+}
+
+type contextFork struct {
+	Name           string `json:"name"`
+	Source         string `json:"source"`
+	Copy           string `json:"copy"`
+	ComposeProject string `json:"compose_project"`
 }
 
 type contextConfigManifest struct {
@@ -104,6 +112,16 @@ func buildContextManifest(cfg Config, projectDir string, command []string, inter
 		paths.Output = "/output"
 	}
 
+	var fork *contextFork
+	if cfg.Fork.Name != "" {
+		fork = &contextFork{
+			Name:           cfg.Fork.Name,
+			Source:         cfg.Fork.Source,
+			Copy:           cfg.Fork.Copy,
+			ComposeProject: cfg.Fork.ComposeProject,
+		}
+	}
+
 	return contextManifest{
 		SchemaVersion:  1,
 		InsideYolobox:  true,
@@ -124,6 +142,7 @@ func buildContextManifest(cfg Config, projectDir string, command []string, inter
 			GhTokenForwarded:       ghTokenForwarded,
 		},
 		Paths: paths,
+		Fork:  fork,
 		Config: contextConfigManifest{
 			Runtime:               resolvedRuntimeName(cfg.Runtime),
 			Image:                 cfg.Image,
