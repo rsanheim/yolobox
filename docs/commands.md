@@ -10,6 +10,7 @@ yolobox codex
 yolobox gemini
 yolobox opencode
 yolobox copilot
+yolobox pi
 ```
 
 That is the intended path. You point the agent at a project and let it work inside the sandbox.
@@ -24,6 +25,7 @@ yolobox codex
 yolobox gemini
 yolobox opencode
 yolobox copilot
+yolobox pi
 ```
 
 These launch the matching tool inside yolobox and apply the tool-specific YOLO-mode wrapper when one exists.

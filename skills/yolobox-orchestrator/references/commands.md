@@ -24,6 +24,9 @@ Launch an AI CLI in the box:
 yolobox codex
 yolobox claude
 yolobox gemini
+yolobox opencode
+yolobox copilot
+yolobox pi
 ```
 
 ## Isolation controls

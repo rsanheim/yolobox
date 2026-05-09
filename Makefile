@@ -54,6 +54,12 @@ smoke-test: build
 		echo "  ✗ codex"; \
 		failed=1; \
 	fi; \
+	if ./$(BINARY) run --scratch pi --version >/dev/null 2>&1; then \
+		echo "  ✓ pi"; \
+	else \
+		echo "  ✗ pi"; \
+		failed=1; \
+	fi; \
 	IMG_VER=$$(./$(BINARY) run --scratch /usr/local/bin/claude --version 2>/dev/null | head -1); \
 	RUN_VER=$$(./$(BINARY) run claude --version 2>/dev/null | head -1); \
 	if [ "$$IMG_VER" = "$$RUN_VER" ]; then \

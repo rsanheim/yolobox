@@ -45,7 +45,7 @@ cd /path/to/your/project
 yolobox claude    # Let it rip
 ```
 
-Or use any other AI tool: `yolobox codex`, `yolobox gemini`, `yolobox copilot`.
+Or use any other AI tool: `yolobox codex`, `yolobox gemini`, `yolobox opencode`, `yolobox copilot`, `yolobox pi`.
 
 Non-interactive invocations keep stdout and stderr separate, so shell redirection works as expected:
 
@@ -56,7 +56,7 @@ yolobox claude -- -p "Hello" 2>/dev/null
 ## What's in the Box?
 
 The base image comes batteries-included:
-- **AI CLIs**: Claude Code, Gemini CLI, OpenAI Codex, OpenCode, Copilot (all pre-configured for full-auto mode!)
+- **AI CLIs**: Claude Code, Gemini CLI, OpenAI Codex, OpenCode, Copilot, Pi (all pre-configured for full-auto mode!)
 - **Runtimes**: Node.js 22, Python 3, Go, Bun
 - **Build tools**: make, cmake, gcc
 - **Git** + **GitHub CLI**
@@ -75,8 +75,11 @@ Inside yolobox, the AI CLIs are aliased to skip all permission prompts:
 | `gemini` | `gemini --yolo` |
 | `opencode` | `opencode` (no yolo flag available yet) |
 | `copilot` | `copilot --yolo` |
+| `pi` | `pi` (no yolo flag available yet) |
 
 No confirmations, no guardrails—just pure unfiltered AI, the way nature intended.
+
+OpenCode and Pi do not have dedicated yolo flags yet, but they still run inside the yolobox sandbox.
 
 For Codex, yolobox pins approval and sandbox mode explicitly so upstream trust defaults and Linux sandbox backend changes do not change the wrapper behavior.
 
@@ -158,6 +161,7 @@ yolobox codex               # Run OpenAI Codex
 yolobox gemini              # Run Gemini CLI
 yolobox opencode            # Run OpenCode
 yolobox copilot             # Run GitHub Copilot
+yolobox pi                  # Run Pi
 
 # General commands
 yolobox                     # Drop into interactive shell (for manual use)
@@ -199,6 +203,7 @@ Settings are saved to `~/.config/yolobox/config.toml`:
 ```toml
 git_config = true
 opencode_config = true
+pi_config = true
 gh_token = true
 ssh_agent = true
 docker = true
@@ -229,7 +234,7 @@ Priority: CLI flags > project config > global config > defaults.
 
 Each `runtime_args` entry is a single CLI argument. For flags that take a value, add them as separate entries so `--security-opt seccomp=unconfined` becomes `["--security-opt", "seccomp=unconfined"]`.
 
-> **Note:** Setting `claude_config = true`, `codex_config = true`, `gemini_config = true`, or `opencode_config = true` in your config will copy your host config on **every** container start. Claude, Gemini, and OpenCode config sync replaces the matching in-container config directory, overwriting changes made inside the container. Codex config sync merges host files into `~/.codex` and preserves a valid in-container `auth.json` when the host copy has no usable auth file. Prefer using `--claude-config`, `--codex-config`, `--gemini-config`, or `--opencode-config` for one-time syncs.
+> **Note:** Setting `claude_config = true`, `codex_config = true`, `gemini_config = true`, `opencode_config = true`, or `pi_config = true` in your config will copy your host config on **every** container start. Claude, Gemini, OpenCode, and Pi config sync replaces the matching in-container config directory, overwriting changes made inside the container. Codex config sync merges host files into `~/.codex` and preserves a valid in-container `auth.json` when the host copy has no usable auth file. Prefer using `--claude-config`, `--codex-config`, `--gemini-config`, `--opencode-config`, or `--pi-config` for one-time syncs.
 
 yolobox removes a zero-byte `/home/yolo/.codex/auth.json` during startup. Recent Codex versions fail with `EOF while parsing a value` when that stale file exists; removing it lets Codex recreate auth normally or show the sign-in flow.
 
@@ -281,9 +286,11 @@ Files copied (if they exist on your host):
 | Gemini | `~/.gemini/GEMINI.md` | `/home/yolo/.gemini/GEMINI.md` |
 | Codex | `~/.codex/AGENTS.md` | `/home/yolo/.codex/AGENTS.md` |
 | Codex skills | `~/.codex/skills/` | `/home/yolo/.codex/skills/` |
+| Pi | `~/.pi/agent/AGENTS.md` | `/home/yolo/.pi/agent/AGENTS.md` |
+| Pi skills | `~/.pi/agent/skills/` | `/home/yolo/.pi/agent/skills/` |
 | Copilot | `~/.copilot/agents/` | `/home/yolo/.copilot/agents/` |
 
-**Note:** This copies instructions and skills, not full configs (credentials, settings, history). For full tool configs, use `--claude-config`, `--codex-config`, `--gemini-config`, or `--opencode-config`.
+**Note:** This copies instructions and skills, not full configs (credentials, settings, history). For full tool configs, use `--claude-config`, `--codex-config`, `--gemini-config`, `--opencode-config`, or `--pi-config`.
 
 You can also set `copy_agent_instructions = true` in your config file for persistent use.
 
@@ -296,6 +303,17 @@ These are automatically passed into the container if set:
 - `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_TOKEN`
 - `OPENROUTER_API_KEY`
 - `GEMINI_API_KEY`
+- `AZURE_OPENAI_API_KEY`
+- `CEREBRAS_API_KEY`
+- `DEEPSEEK_API_KEY`
+- `FIREWORKS_API_KEY`
+- `GROQ_API_KEY`
+- `KIMI_API_KEY`
+- `MINIMAX_API_KEY`
+- `MISTRAL_API_KEY`
+- `XAI_API_KEY`
+- `ZAI_API_KEY`
+- `AI_GATEWAY_API_KEY`
 
 ### Runtime Context Manifest
 
@@ -347,6 +365,7 @@ Both skills follow the standard Agent Skills layout so they can be validated and
 | `--codex-config` | Copy host `~/.codex` config into container | |
 | `--gemini-config` | Copy host `~/.gemini` config into container | |
 | `--opencode-config` | Copy host `~/.config/opencode` config into container | |
+| `--pi-config` | Copy host `~/.pi/agent` config into container | |
 | `--git-config` | Copy host `~/.gitconfig` into container | |
 | `--gh-token` | Forward GitHub token for `gh` and HTTPS Git auth (extracts from keychain via `gh auth token`) | |
 | `--copy-agent-instructions` | Copy global agent instruction files and skills (see configuration below) | |

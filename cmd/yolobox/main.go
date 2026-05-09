@@ -55,6 +55,17 @@ var autoPassthroughEnvVars = []string{
 	"GH_TOKEN",
 	"OPENROUTER_API_KEY",
 	"GEMINI_API_KEY",
+	"AZURE_OPENAI_API_KEY",
+	"CEREBRAS_API_KEY",
+	"DEEPSEEK_API_KEY",
+	"FIREWORKS_API_KEY",
+	"GROQ_API_KEY",
+	"KIMI_API_KEY",
+	"MINIMAX_API_KEY",
+	"MISTRAL_API_KEY",
+	"XAI_API_KEY",
+	"ZAI_API_KEY",
+	"AI_GATEWAY_API_KEY",
 }
 
 // Tool shortcuts - these become direct subcommands (e.g., "yolobox claude")
@@ -64,6 +75,7 @@ var toolShortcuts = []string{
 	"gemini",
 	"opencode",
 	"copilot",
+	"pi",
 }
 
 var sizePattern = regexp.MustCompile(`^\d+(?:\.\d+)?(?:[kKmMgGtTpP](?:i?[bB]?)?|[bB])?$`)
@@ -272,6 +284,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  --codex-config        Copy host Codex config to container")
 	fmt.Fprintln(os.Stderr, "  --gemini-config       Copy host Gemini config to container")
 	fmt.Fprintln(os.Stderr, "  --opencode-config     Copy host OpenCode config to container")
+	fmt.Fprintln(os.Stderr, "  --pi-config           Copy host Pi config to container")
 	fmt.Fprintln(os.Stderr, "  --git-config          Copy host git config to container")
 	fmt.Fprintln(os.Stderr, "  --gh-token            Forward GitHub token for gh and HTTPS git")
 	fmt.Fprintln(os.Stderr, "  --copy-agent-instructions  Copy global agent instructions and skills")
@@ -336,6 +349,7 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 		codexConfig           bool
 		geminiConfig          bool
 		opencodeConfig        bool
+		piConfig              bool
 		gitConfig             bool
 		ghToken               bool
 		copyAgentInstructions bool
@@ -375,9 +389,10 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 	fs.BoolVar(&codexConfig, "codex-config", false, "copy host Codex config to container")
 	fs.BoolVar(&geminiConfig, "gemini-config", false, "copy host Gemini config to container")
 	fs.BoolVar(&opencodeConfig, "opencode-config", false, "copy host OpenCode config to container")
+	fs.BoolVar(&piConfig, "pi-config", false, "copy host Pi config to container")
 	fs.BoolVar(&gitConfig, "git-config", false, "copy host git config to container")
 	fs.BoolVar(&ghToken, "gh-token", false, "forward GitHub CLI token (from gh auth token)")
-	fs.BoolVar(&copyAgentInstructions, "copy-agent-instructions", false, "copy agent instruction files and skills (CLAUDE.md, ~/.claude/skills, GEMINI.md, AGENTS.md, ~/.codex/skills)")
+	fs.BoolVar(&copyAgentInstructions, "copy-agent-instructions", false, "copy agent instruction files and skills")
 	fs.BoolVar(&noProject, "no-project", false, "skip automatic project mount (caller provides mounts and workdir)")
 	fs.BoolVar(&docker, "docker", false, "mount Docker socket and join shared network")
 	fs.BoolVar(&clipboard, "clipboard", false, "bridge text clipboard copy/paste to the host")
@@ -446,6 +461,9 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 	}
 	if opencodeConfig {
 		cfg.OpencodeConfig = true
+	}
+	if piConfig {
+		cfg.PiConfig = true
 	}
 	if gitConfig {
 		cfg.GitConfig = true
@@ -830,6 +848,9 @@ func runSetup() (Config, error) {
 	if cfg.OpencodeConfig {
 		selectedOptions = append(selectedOptions, "opencode_config")
 	}
+	if cfg.PiConfig {
+		selectedOptions = append(selectedOptions, "pi_config")
+	}
 	if cfg.GhToken {
 		selectedOptions = append(selectedOptions, "gh_token")
 	}
@@ -874,6 +895,7 @@ func runSetup() (Config, error) {
 					huh.NewOption("Codex config (copy ~/.codex)", "codex_config"),
 					huh.NewOption("Gemini config (copy ~/.gemini)", "gemini_config"),
 					huh.NewOption("OpenCode config (copy ~/.config/opencode)", "opencode_config"),
+					huh.NewOption("Pi config (copy ~/.pi/agent)", "pi_config"),
 					huh.NewOption("GitHub token (gh + HTTPS git auth)", "gh_token"),
 					huh.NewOption("SSH agent (for git over SSH)", "ssh_agent"),
 					huh.NewOption("Docker socket (run containers from sandbox)", "docker"),
@@ -954,6 +976,7 @@ func runSetup() (Config, error) {
 	cfg.CodexConfig = contains(selectedOptions, "codex_config")
 	cfg.GeminiConfig = contains(selectedOptions, "gemini_config")
 	cfg.OpencodeConfig = contains(selectedOptions, "opencode_config")
+	cfg.PiConfig = contains(selectedOptions, "pi_config")
 	cfg.GhToken = contains(selectedOptions, "gh_token")
 	cfg.SSHAgent = contains(selectedOptions, "ssh_agent")
 	cfg.Docker = contains(selectedOptions, "docker")
@@ -1013,7 +1036,7 @@ func splitToolArgs(args []string) (yoloboxArgs, toolArgs []string) {
 		"runtime": true, "image": true, "network": true, "pod": true,
 		"ssh-agent": true, "readonly-project": true, "no-network": true,
 		"no-yolo": true, "scratch": true, "claude-config": true,
-		"codex-config": true, "gemini-config": true, "opencode-config": true, "git-config": true, "gh-token": true,
+		"codex-config": true, "gemini-config": true, "opencode-config": true, "pi-config": true, "git-config": true, "gh-token": true,
 		"copy-agent-instructions": true, "no-project": true, "docker": true, "setup": true, "mount": true,
 		"clipboard": true,
 		"exclude":   true, "copy-as": true,
@@ -1328,6 +1351,28 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 		}
 	}
 
+	// Mount Pi config from host to staging area (copied to /home/yolo by entrypoint)
+	if cfg.PiConfig {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, nil, err
+		}
+		piConfigDir := filepath.Join(home, ".pi", "agent")
+		if _, err := os.Stat(piConfigDir); err == nil {
+			mountSrc := piConfigDir
+			if dirContainsSymlinks(piConfigDir) {
+				staged, err := stageDirResolvingSymlinks(piConfigDir)
+				if err != nil {
+					warn("Failed to resolve symlinks in %s: %s", piConfigDir, err)
+				} else {
+					mountSrc = staged
+					cleanupPaths = append(cleanupPaths, staged)
+				}
+			}
+			args = append(args, "-v", mountSrc+":/host-pi/.pi/agent:ro")
+		}
+	}
+
 	// Mount Codex config from host to staging area (copied to /home/yolo by entrypoint)
 	if cfg.CodexConfig {
 		home, err := os.UserHomeDir()
@@ -1429,6 +1474,30 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 				}
 			}
 			args = append(args, "-v", mountSrc+":/host-agent-instructions/codex/skills:ro")
+		}
+		// Pi: ~/.pi/agent/AGENTS.md
+		piMd := filepath.Join(home, ".pi", "agent", "AGENTS.md")
+		if _, err := os.Stat(piMd); err == nil {
+			if appleContainer {
+				appleContainerFiles[piMd] = "agent-instructions/pi/AGENTS.md"
+			} else {
+				args = append(args, "-v", piMd+":/host-agent-instructions/pi/AGENTS.md:ro")
+			}
+		}
+		// Pi: ~/.pi/agent/skills/ directory
+		piSkills := filepath.Join(home, ".pi", "agent", "skills")
+		if info, err := os.Stat(piSkills); err == nil && info.IsDir() {
+			mountSrc := piSkills
+			if dirContainsSymlinks(piSkills) {
+				staged, err := stageDirResolvingSymlinks(piSkills)
+				if err != nil {
+					warn("Failed to resolve symlinks in %s: %s", piSkills, err)
+				} else {
+					mountSrc = staged
+					cleanupPaths = append(cleanupPaths, staged)
+				}
+			}
+			args = append(args, "-v", mountSrc+":/host-agent-instructions/pi/skills:ro")
 		}
 		// Copilot: ~/.copilot/agents/ directory (this is already a directory, works with Apple container)
 		copilotAgents := filepath.Join(home, ".copilot", "agents")

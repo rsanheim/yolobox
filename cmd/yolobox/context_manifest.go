@@ -72,6 +72,7 @@ type contextConfigManifest struct {
 	CodexConfig           bool                           `json:"codex_config"`
 	GeminiConfig          bool                           `json:"gemini_config"`
 	OpencodeConfig        bool                           `json:"opencode_config"`
+	PiConfig              bool                           `json:"pi_config"`
 	GitConfig             bool                           `json:"git_config"`
 	GhToken               bool                           `json:"gh_token"`
 	CopyAgentInstructions bool                           `json:"copy_agent_instructions"`
@@ -172,6 +173,7 @@ func buildContextManifest(cfg Config, projectDir string, command []string, inter
 			CodexConfig:           cfg.CodexConfig,
 			GeminiConfig:          cfg.GeminiConfig,
 			OpencodeConfig:        cfg.OpencodeConfig,
+			PiConfig:              cfg.PiConfig,
 			GitConfig:             cfg.GitConfig,
 			GhToken:               cfg.GhToken,
 			CopyAgentInstructions: cfg.CopyAgentInstructions,

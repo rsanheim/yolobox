@@ -220,6 +220,11 @@ RUN cp /opt/yolobox/wrapper-template /opt/yolobox/bin/copilot \
     && echo 'exec "$REAL_BIN" --yolo "$@"' >> /opt/yolobox/bin/copilot \
     && chmod +x /opt/yolobox/bin/copilot
 
+# Pi wrapper (no yolo flag; Pi runs with its own tool controls)
+RUN cp /opt/yolobox/wrapper-template /opt/yolobox/bin/pi \
+    && echo 'exec "$REAL_BIN" "$@"' >> /opt/yolobox/bin/pi \
+    && chmod +x /opt/yolobox/bin/pi
+
 # GitHub HTTPS credential helper. When a GitHub token is forwarded into the
 # container, this lets ordinary Git commands authenticate to https://github.com
 # without depending on host-specific helpers such as macOS Keychain.
@@ -319,7 +324,7 @@ RUN printf '%s\n' \
     chmod +x /usr/local/bin/yolobox-uid-fix.sh
 
 # Create entrypoint script
-RUN mkdir -p /host-claude /host-codex /host-gemini /host-opencode /host-git /host-agent-instructions /host-files && \
+RUN mkdir -p /host-claude /host-codex /host-gemini /host-opencode /host-pi /host-git /host-agent-instructions /host-files && \
     printf '%s\n' \
     '#!/bin/bash' \
     '' \
@@ -413,6 +418,15 @@ RUN mkdir -p /host-claude /host-codex /host-gemini /host-opencode /host-git /hos
     '    sudo chown -R yolo:yolo /home/yolo/.config/opencode' \
     'fi' \
     '' \
+    '# Copy Pi config from host staging area if present' \
+    'if [ -d /host-pi/.pi/agent ]; then' \
+    '    echo -e "\033[33m→ Copying host Pi config to container\033[0m" >&2' \
+    '    sudo mkdir -p /home/yolo/.pi' \
+    '    sudo rm -rf /home/yolo/.pi/agent' \
+    '    sudo cp -a /host-pi/.pi/agent /home/yolo/.pi/agent' \
+    '    sudo chown -R yolo:yolo /home/yolo/.pi' \
+    'fi' \
+    '' \
     '# Copy Codex config from host staging area if present' \
     'if [ -d /host-codex/.codex ]; then' \
     '    echo -e "\033[33m→ Copying host Codex config to container\033[0m" >&2' \
@@ -498,6 +512,25 @@ RUN mkdir -p /host-claude /host-codex /host-gemini /host-opencode /host-git /hos
     '    sudo rm -rf /home/yolo/.codex/skills' \
     '    sudo cp -a "$CODEX_SKILLS_DIR" /home/yolo/.codex/skills' \
     '    sudo chown -R yolo:yolo /home/yolo/.codex' \
+    '    COPIED_AGENT_INSTRUCTIONS=1' \
+    'fi' \
+    '# Pi: AGENTS.md' \
+    'PI_MD="/host-agent-instructions/pi/AGENTS.md"' \
+    '[ ! -f "$PI_MD" ] && [ -f "$HF/agent-instructions/pi/AGENTS.md" ] && PI_MD="$HF/agent-instructions/pi/AGENTS.md"' \
+    'if [ -f "$PI_MD" ]; then' \
+    '    mkdir -p /home/yolo/.pi/agent' \
+    '    sudo cp -a "$PI_MD" /home/yolo/.pi/agent/AGENTS.md' \
+    '    sudo chown -R yolo:yolo /home/yolo/.pi' \
+    '    COPIED_AGENT_INSTRUCTIONS=1' \
+    'fi' \
+    '# Pi: skills/ directory' \
+    'PI_SKILLS_DIR="/host-agent-instructions/pi/skills"' \
+    '[ ! -d "$PI_SKILLS_DIR" ] && [ -d "$HF/agent-instructions/pi/skills" ] && PI_SKILLS_DIR="$HF/agent-instructions/pi/skills"' \
+    'if [ -d "$PI_SKILLS_DIR" ]; then' \
+    '    mkdir -p /home/yolo/.pi/agent' \
+    '    sudo rm -rf /home/yolo/.pi/agent/skills' \
+    '    sudo cp -a "$PI_SKILLS_DIR" /home/yolo/.pi/agent/skills' \
+    '    sudo chown -R yolo:yolo /home/yolo/.pi' \
     '    COPIED_AGENT_INSTRUCTIONS=1' \
     'fi' \
     '# Copilot: agents/ directory' \
@@ -601,6 +634,7 @@ RUN NPM_CONFIG_PREFIX="" npm install -g --no-audit --no-fund \
     @openai/codex \
     opencode-ai \
     @github/copilot \
+    @earendil-works/pi-coding-agent \
     && NPM_CONFIG_PREFIX="" npm cache clean --force
 USER yolo
 

@@ -291,7 +291,7 @@ func shellInvocationNeedsTTY(args []string) bool {
 
 func toolInvocationNeedsTTY(tool string, args []string) bool {
 	switch tool {
-	case "claude":
+	case "claude", "pi":
 		for _, arg := range args {
 			if arg == "-p" || arg == "--print" {
 				return false

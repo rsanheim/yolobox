@@ -47,6 +47,7 @@ func TestMergeConfig(t *testing.T) {
 		Scratch:        true,
 		CodexConfig:    true,
 		OpencodeConfig: true,
+		PiConfig:       true,
 		Clipboard:      true,
 	}
 
@@ -72,6 +73,9 @@ func TestMergeConfig(t *testing.T) {
 	}
 	if !dst.OpencodeConfig {
 		t.Error("expected OpencodeConfig to be true")
+	}
+	if !dst.PiConfig {
+		t.Error("expected PiConfig to be true")
 	}
 	if !dst.Clipboard {
 		t.Error("expected Clipboard to be true")
@@ -201,6 +205,30 @@ func TestLoadConfigOpencodeConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfigPiConfig(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	globalConfigPath := filepath.Join(globalConfigDir, "config.toml")
+	if err := os.WriteFile(globalConfigPath, []byte("pi_config = true\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	cfg, err := loadConfig(projectDir)
+	if err != nil {
+		t.Fatalf("loadConfig failed: %v", err)
+	}
+	if !cfg.PiConfig {
+		t.Fatal("expected pi_config to load from config file")
+	}
+}
+
 func TestSaveGlobalConfigToolConfigs(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
@@ -211,6 +239,7 @@ func TestSaveGlobalConfigToolConfigs(t *testing.T) {
 		CodexConfig:    true,
 		GeminiConfig:   true,
 		OpencodeConfig: true,
+		PiConfig:       true,
 	}
 	if err := saveGlobalConfig(cfg); err != nil {
 		t.Fatalf("saveGlobalConfig failed: %v", err)
@@ -227,6 +256,7 @@ func TestSaveGlobalConfigToolConfigs(t *testing.T) {
 		"codex_config = true",
 		"gemini_config = true",
 		"opencode_config = true",
+		"pi_config = true",
 	} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("expected saved config to contain %q, got:\n%s", want, content)
@@ -569,6 +599,16 @@ func TestBuildRunArgsCopyAgentInstructionsIncludesAgentSkills(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(codexDir, "skills", "demo-codex-skill", "SKILL.md"), []byte("---\nname: demo-codex-skill\ndescription: test\n---\n"), 0644); err != nil {
 		t.Fatalf("failed to write Codex skill: %v", err)
 	}
+	piDir := filepath.Join(homeDir, ".pi", "agent")
+	if err := os.MkdirAll(filepath.Join(piDir, "skills", "demo-pi-skill"), 0755); err != nil {
+		t.Fatalf("failed to create Pi skills dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(piDir, "AGENTS.md"), []byte("host pi guidance\n"), 0644); err != nil {
+		t.Fatalf("failed to write Pi AGENTS.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(piDir, "skills", "demo-pi-skill", "SKILL.md"), []byte("---\nname: demo-pi-skill\ndescription: test\n---\n"), 0644); err != nil {
+		t.Fatalf("failed to write Pi skill: %v", err)
+	}
 
 	cfg := Config{CopyAgentInstructions: true}
 	args, _, err := buildRunArgs(cfg, projectDir, []string{"echo", "hello"}, false)
@@ -589,6 +629,12 @@ func TestBuildRunArgsCopyAgentInstructionsIncludesAgentSkills(t *testing.T) {
 	if !strings.Contains(argsStr, filepath.Join(codexDir, "skills")+":/host-agent-instructions/codex/skills:ro") {
 		t.Fatalf("expected Codex skills mount, got %s", argsStr)
 	}
+	if !strings.Contains(argsStr, filepath.Join(piDir, "AGENTS.md")+":/host-agent-instructions/pi/AGENTS.md:ro") {
+		t.Fatalf("expected Pi AGENTS.md mount, got %s", argsStr)
+	}
+	if !strings.Contains(argsStr, filepath.Join(piDir, "skills")+":/host-agent-instructions/pi/skills:ro") {
+		t.Fatalf("expected Pi skills mount, got %s", argsStr)
+	}
 }
 
 func TestBuildRunArgsContextManifestContents(t *testing.T) {
@@ -605,6 +651,7 @@ func TestBuildRunArgsContextManifestContents(t *testing.T) {
 		CodexConfig:       true,
 		GeminiConfig:      true,
 		OpencodeConfig:    true,
+		PiConfig:          true,
 		Clipboard:         true,
 		ClipboardEndpoint: "http://host.docker.internal:12345",
 		ClipboardToken:    "test-token",
@@ -702,6 +749,9 @@ func TestBuildRunArgsContextManifestContents(t *testing.T) {
 	}
 	if !manifest.Config.OpencodeConfig {
 		t.Fatal("expected opencode_config in manifest config")
+	}
+	if !manifest.Config.PiConfig {
+		t.Fatal("expected pi_config in manifest config")
 	}
 	if !manifest.Config.Clipboard {
 		t.Fatal("expected clipboard in manifest config")
@@ -1081,6 +1131,34 @@ func TestBuildRunArgsOpencodeConfig(t *testing.T) {
 	}
 }
 
+func TestBuildRunArgsPiConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	piConfigDir := filepath.Join(home, ".pi", "agent")
+	if err := os.MkdirAll(piConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create pi config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(piConfigDir, "settings.json"), []byte("{}\n"), 0644); err != nil {
+		t.Fatalf("failed to write pi config file: %v", err)
+	}
+
+	cfg := Config{
+		Image:    "test-image",
+		PiConfig: true,
+	}
+
+	args, _, err := buildRunArgs(cfg, "/test/project", []string{"bash"}, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	argsStr := strings.Join(args, " ")
+	if !strings.Contains(argsStr, piConfigDir+":/host-pi/.pi/agent:ro") {
+		t.Fatalf("expected pi config mount, got %s", argsStr)
+	}
+}
+
 func TestDockerfileCodexConfigImportPreservesAuth(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
 	if err != nil {
@@ -1109,6 +1187,28 @@ func TestDockerfileCodexConfigImportPreservesAuth(t *testing.T) {
 	} {
 		if !strings.Contains(block, want) {
 			t.Fatalf("expected Codex config import block to contain %q", want)
+		}
+	}
+}
+
+func TestDockerfilePiConfigAndInstructionsImport(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read Dockerfile: %v", err)
+	}
+	dockerfile := string(data)
+
+	for _, want := range []string{
+		"/host-pi",
+		"/host-pi/.pi/agent",
+		"sudo cp -a /host-pi/.pi/agent /home/yolo/.pi/agent",
+		"/host-agent-instructions/pi/AGENTS.md",
+		"/host-agent-instructions/pi/skills",
+		"sudo cp -a \"$PI_MD\" /home/yolo/.pi/agent/AGENTS.md",
+		"sudo cp -a \"$PI_SKILLS_DIR\" /home/yolo/.pi/agent/skills",
+	} {
+		if !strings.Contains(dockerfile, want) {
+			t.Fatalf("expected Dockerfile to contain %q", want)
 		}
 	}
 }
@@ -1340,6 +1440,13 @@ func TestShouldAttachTTY(t *testing.T) {
 		{
 			name:      "claude print mode keeps streams separate",
 			command:   []string{"claude", "-p", "hello"},
+			stdinTTY:  true,
+			stdoutTTY: true,
+			want:      false,
+		},
+		{
+			name:      "pi print mode keeps streams separate",
+			command:   []string{"pi", "--print", "hello"},
 			stdinTTY:  true,
 			stdoutTTY: true,
 			want:      false,
@@ -1730,6 +1837,7 @@ func TestToolShortcuts(t *testing.T) {
 		"gemini",
 		"opencode",
 		"copilot",
+		"pi",
 	}
 
 	for _, tool := range expected {
@@ -2064,6 +2172,12 @@ func TestSplitToolArgs(t *testing.T) {
 			wantTool:    []string{"--resume"},
 		},
 		{
+			name:        "pi config flag stays with yolobox",
+			args:        []string{"--pi-config", "--resume"},
+			wantYolobox: []string{"--pi-config"},
+			wantTool:    []string{"--resume"},
+		},
+		{
 			name:        "multiple yolobox flags then tool args",
 			args:        []string{"--no-network", "--scratch", "--resume", "abc123"},
 			wantYolobox: []string{"--no-network", "--scratch"},
@@ -2172,6 +2286,17 @@ func TestParseFlagsOpencodeConfig(t *testing.T) {
 		t.Fatal("expected OpencodeConfig to be true after parsing --opencode-config")
 	}
 	expectSliceEqual(t, rest, []string{"opencode", "--version"})
+}
+
+func TestParseFlagsPiConfig(t *testing.T) {
+	cfg, rest, err := parseBaseFlags("run", []string{"--pi-config", "pi", "--version"}, t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.PiConfig {
+		t.Fatal("expected PiConfig to be true after parsing --pi-config")
+	}
+	expectSliceEqual(t, rest, []string{"pi", "--version"})
 }
 
 func TestParseFlagsClipboard(t *testing.T) {

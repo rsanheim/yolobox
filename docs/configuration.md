@@ -15,6 +15,7 @@ Applies to all projects:
 ```toml
 git_config = true
 opencode_config = true
+pi_config = true
 gh_token = true
 ssh_agent = true
 docker = true
@@ -120,9 +121,11 @@ Files copied if they exist on your host:
 | Gemini | `~/.gemini/GEMINI.md` | `/home/yolo/.gemini/GEMINI.md` |
 | Codex | `~/.codex/AGENTS.md` | `/home/yolo/.codex/AGENTS.md` |
 | Codex skills | `~/.codex/skills/` | `/home/yolo/.codex/skills/` |
+| Pi | `~/.pi/agent/AGENTS.md` | `/home/yolo/.pi/agent/AGENTS.md` |
+| Pi skills | `~/.pi/agent/skills/` | `/home/yolo/.pi/agent/skills/` |
 | Copilot | `~/.copilot/agents/` | `/home/yolo/.copilot/agents/` |
 
-This copies instruction files and skills, not full configs, credentials, settings, or history. For full tool configs, use `--claude-config`, `--codex-config`, `--gemini-config`, or `--opencode-config`.
+This copies instruction files and skills, not full configs, credentials, settings, or history. For full tool configs, use `--claude-config`, `--codex-config`, `--gemini-config`, `--opencode-config`, or `--pi-config`.
 
 ## Auto-forwarded environment variables
 
@@ -134,6 +137,17 @@ These are automatically passed into the container if they are set on the host:
 - `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` / `GITHUB_TOKEN`
 - `OPENROUTER_API_KEY`
 - `GEMINI_API_KEY`
+- `AZURE_OPENAI_API_KEY`
+- `CEREBRAS_API_KEY`
+- `DEEPSEEK_API_KEY`
+- `FIREWORKS_API_KEY`
+- `GROQ_API_KEY`
+- `KIMI_API_KEY`
+- `MINIMAX_API_KEY`
+- `MISTRAL_API_KEY`
+- `XAI_API_KEY`
+- `ZAI_API_KEY`
+- `AI_GATEWAY_API_KEY`
 
 ::: tip macOS and GitHub tokens
 On macOS, `gh` stores tokens in Keychain, not environment variables. Use `--gh-token` or `gh_token = true` if you want yolobox to extract and forward the GitHub token. When a token is present, yolobox also configures HTTPS Git auth for `github.com` remotes.
@@ -155,7 +169,7 @@ yolobox also injects a managed guidance block into `~/.claude/CLAUDE.md` and `~/
 ## Config sync warning
 
 ::: warning
-Setting `claude_config = true`, `codex_config = true`, `gemini_config = true`, or `opencode_config = true` in config copies your host config on every container start. Claude, Gemini, and OpenCode config sync replaces the matching in-container config directory, overwriting changes made inside the container. Codex config sync merges host files into `~/.codex` and preserves a valid in-container `auth.json` when the host copy has no usable auth file. Prefer `--claude-config`, `--codex-config`, `--gemini-config`, or `--opencode-config` for one-time syncs.
+Setting `claude_config = true`, `codex_config = true`, `gemini_config = true`, `opencode_config = true`, or `pi_config = true` in config copies your host config on every container start. Claude, Gemini, OpenCode, and Pi config sync replaces the matching in-container config directory, overwriting changes made inside the container. Codex config sync merges host files into `~/.codex` and preserves a valid in-container `auth.json` when the host copy has no usable auth file. Prefer `--claude-config`, `--codex-config`, `--gemini-config`, `--opencode-config`, or `--pi-config` for one-time syncs.
 :::
 
 yolobox removes a zero-byte `/home/yolo/.codex/auth.json` during startup. Recent Codex versions fail with `EOF while parsing a value` when that stale file exists; removing it lets Codex recreate auth normally or show the sign-in flow.
