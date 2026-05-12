@@ -35,12 +35,13 @@ Flags go after the subcommand: `yolobox run --flag cmd` or `yolobox claude --fla
 | `--gh-token` | Forward GitHub token for `gh` and HTTPS Git auth from `gh auth token` | |
 | `--copy-agent-instructions` | Copy global instruction files and skills into the container | |
 | `--clipboard` | Bridge text clipboard copy/paste between the container and host | `--no-network` |
+| `--open-bridge` | Bridge `open`/`xdg-open` HTTP(S) URLs to the host browser | `--no-network` |
 
 ## Networking and behavior
 
 | Flag | Description | Incompatible with |
 |------|-------------|-------------------|
-| `--no-network` | Disable network access | `--network`, `--pod`, `--docker`, `--clipboard` |
+| `--no-network` | Disable network access | `--network`, `--pod`, `--docker`, `--clipboard`, `--open-bridge` |
 | `--network <name>` | Join a specific network | `--no-network`, `--pod` |
 | `--pod <name>` | Join an existing Podman pod | `--no-network`, `--network`, `--docker` |
 | `--no-yolo` | Disable auto-confirmations | |
@@ -103,6 +104,16 @@ This makes text copy/paste operations from tools such as Codex and Claude Code r
 
 ::: warning
 `--clipboard` cannot be combined with `--no-network`, and it intentionally creates a host-write channel from inside the container.
+:::
+
+## Host URL open bridge
+
+The `--open-bridge` flag starts a short-lived host proxy and exposes `open` and `xdg-open` command shims inside the container.
+
+The bridge only accepts `http://` and `https://` URLs and asks the host OS to open them in the default browser.
+
+::: warning
+`--open-bridge` cannot be combined with `--no-network`, and it intentionally creates a host browser action channel from inside the container.
 :::
 
 ## Project file filtering

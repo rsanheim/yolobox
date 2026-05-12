@@ -19,8 +19,9 @@ gh_token = true
 ssh_agent = true
 docker = true
 clipboard = true
+open_bridge = true
 network = "my_compose_network"
-# no_network = true # incompatible with network, pod, docker, and clipboard
+# no_network = true # incompatible with network, pod, docker, clipboard, and open_bridge
 no_env_passthrough = true
 no_yolo = true
 cpus = "4"
@@ -108,6 +109,12 @@ runtime_args = ["--security-opt", "seccomp=unconfined"]
 Set `clipboard = true` or pass `--clipboard` to bridge text clipboard copy/paste between the container and the host. yolobox starts a short-lived host proxy for the session and exposes clipboard command shims inside the container: `pbcopy`, `pbpaste`, `xclip`, `xsel`, `wl-copy`, and `wl-paste`.
 
 `clipboard = true` cannot be combined with `no_network = true`.
+
+## Host URL open bridge
+
+Set `open_bridge = true` or pass `--open-bridge` to bridge URL opening from the container to the host. yolobox starts a short-lived host proxy for the session and exposes `open` and `xdg-open` shims inside the container.
+
+The bridge only accepts `http://` and `https://` URLs and asks the host OS to open them in the default browser. `open_bridge = true` cannot be combined with `no_network = true`.
 
 ## Global agent instructions {#global-agent-instructions}
 

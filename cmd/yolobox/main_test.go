@@ -49,6 +49,7 @@ func TestMergeConfig(t *testing.T) {
 		CodexConfig:      true,
 		OpencodeConfig:   true,
 		Clipboard:        true,
+		OpenBridge:       true,
 	}
 
 	mergeConfig(&dst, src)
@@ -79,6 +80,9 @@ func TestMergeConfig(t *testing.T) {
 	}
 	if !dst.Clipboard {
 		t.Error("expected Clipboard to be true")
+	}
+	if !dst.OpenBridge {
+		t.Error("expected OpenBridge to be true")
 	}
 }
 
@@ -259,6 +263,30 @@ func TestLoadConfigClipboard(t *testing.T) {
 	}
 	if !cfg.Clipboard {
 		t.Fatal("expected clipboard to load from config file")
+	}
+}
+
+func TestLoadConfigOpenBridge(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	globalConfigPath := filepath.Join(globalConfigDir, "config.toml")
+	if err := os.WriteFile(globalConfigPath, []byte("open_bridge = true\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	cfg, err := loadConfig(projectDir)
+	if err != nil {
+		t.Fatalf("loadConfig failed: %v", err)
+	}
+	if !cfg.OpenBridge {
+		t.Fatal("expected open_bridge to load from config file")
 	}
 }
 
@@ -636,18 +664,21 @@ func TestBuildRunArgsContextManifestContents(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "test-key")
 
 	cfg := Config{
-		Image:             "test-image",
-		Env:               []string{"FOO=bar", "SUPER_SECRET=do-not-leak", "DEBUG"},
-		ReadonlyProject:   true,
-		NoYolo:            true,
-		ClaudeConfig:      true,
-		CodexConfig:       true,
-		GeminiConfig:      true,
-		OpencodeConfig:    true,
-		Clipboard:         true,
-		ClipboardEndpoint: "http://host.docker.internal:12345",
-		ClipboardToken:    "test-token",
-		Network:           "devnet",
+		Image:              "test-image",
+		Env:                []string{"FOO=bar", "SUPER_SECRET=do-not-leak", "DEBUG"},
+		ReadonlyProject:    true,
+		NoYolo:             true,
+		ClaudeConfig:       true,
+		CodexConfig:        true,
+		GeminiConfig:       true,
+		OpencodeConfig:     true,
+		Clipboard:          true,
+		ClipboardEndpoint:  "http://host.docker.internal:12345",
+		ClipboardToken:     "test-token",
+		OpenBridge:         true,
+		OpenBridgeEndpoint: "http://host.docker.internal:23456",
+		OpenBridgeToken:    "open-token",
+		Network:            "devnet",
 		Customize: CustomizeConfig{
 			Packages:   []string{"jq"},
 			Dockerfile: ".yolobox.Dockerfile",
@@ -744,6 +775,9 @@ func TestBuildRunArgsContextManifestContents(t *testing.T) {
 	}
 	if !manifest.Config.Clipboard {
 		t.Fatal("expected clipboard in manifest config")
+	}
+	if !manifest.Config.OpenBridge {
+		t.Fatal("expected open_bridge in manifest config")
 	}
 	if !reflect.DeepEqual(manifest.Config.Customize.Packages, []string{"jq"}) {
 		t.Fatalf("unexpected customize packages: %v", manifest.Config.Customize.Packages)
@@ -2277,6 +2311,17 @@ func TestParseFlagsClipboard(t *testing.T) {
 	expectSliceEqual(t, rest, []string{"codex", "--version"})
 }
 
+func TestParseFlagsOpenBridge(t *testing.T) {
+	cfg, rest, err := parseBaseFlags("run", []string{"--open-bridge", "codex", "--version"}, t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.OpenBridge {
+		t.Fatal("expected OpenBridge to be true after parsing --open-bridge")
+	}
+	expectSliceEqual(t, rest, []string{"codex", "--version"})
+}
+
 func TestParseFlagsNoEnvPassthrough(t *testing.T) {
 	cfg, rest, err := parseBaseFlags("run", []string{"--no-env-passthrough", "codex", "--version"}, t.TempDir())
 	if err != nil {
@@ -2298,6 +2343,16 @@ func TestValidateClipboardNoNetworkConflict(t *testing.T) {
 	}
 }
 
+func TestValidateOpenBridgeNoNetworkConflict(t *testing.T) {
+	err := validateConfigConflicts(Config{OpenBridge: true, NoNetwork: true})
+	if err == nil {
+		t.Fatal("expected open-bridge/no-network conflict")
+	}
+	if !strings.Contains(err.Error(), "--open-bridge") {
+		t.Fatalf("expected open-bridge error, got %v", err)
+	}
+}
+
 func TestBuildRunArgsClipboard(t *testing.T) {
 	cfg := Config{
 		Image:             "test-image",
@@ -2316,6 +2371,31 @@ func TestBuildRunArgsClipboard(t *testing.T) {
 		"YOLOBOX_CLIPBOARD=1",
 		"YOLOBOX_CLIPBOARD_ENDPOINT=http://host.docker.internal:12345",
 		"YOLOBOX_CLIPBOARD_TOKEN=test-token",
+	} {
+		if !strings.Contains(argsStr, want) {
+			t.Fatalf("expected %s in args: %s", want, argsStr)
+		}
+	}
+}
+
+func TestBuildRunArgsOpenBridge(t *testing.T) {
+	cfg := Config{
+		Image:              "test-image",
+		OpenBridge:         true,
+		OpenBridgeEndpoint: "http://host.docker.internal:23456",
+		OpenBridgeToken:    "open-token",
+	}
+
+	args, _, err := buildRunArgs(cfg, "/test/project", []string{"bash"}, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	argsStr := strings.Join(args, " ")
+	for _, want := range []string{
+		"YOLOBOX_OPEN_BRIDGE=1",
+		"YOLOBOX_OPEN_BRIDGE_ENDPOINT=http://host.docker.internal:23456",
+		"YOLOBOX_OPEN_BRIDGE_TOKEN=open-token",
 	} {
 		if !strings.Contains(argsStr, want) {
 			t.Fatalf("expected %s in args: %s", want, argsStr)

@@ -78,6 +78,7 @@ type contextConfigManifest struct {
 	CopyAgentInstructions bool                           `json:"copy_agent_instructions"`
 	Docker                bool                           `json:"docker"`
 	Clipboard             bool                           `json:"clipboard"`
+	OpenBridge            bool                           `json:"open_bridge"`
 	CPUs                  string                         `json:"cpus"`
 	Memory                string                         `json:"memory"`
 	ShmSize               string                         `json:"shm_size"`
@@ -179,6 +180,7 @@ func buildContextManifest(cfg Config, projectDir string, command []string, inter
 			CopyAgentInstructions: cfg.CopyAgentInstructions,
 			Docker:                cfg.Docker,
 			Clipboard:             cfg.Clipboard,
+			OpenBridge:            cfg.OpenBridge,
 			CPUs:                  cfg.CPUs,
 			Memory:                cfg.Memory,
 			ShmSize:               cfg.ShmSize,

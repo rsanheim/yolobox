@@ -195,6 +195,27 @@ RUN printf '%s\n' \
     && ln -s yolobox-clipboard /opt/yolobox/bin/xclip \
     && ln -s yolobox-clipboard /opt/yolobox/bin/xsel
 
+# URL open shims used by --open-bridge. These intentionally accept only a
+# single URL argument; the host bridge validates that it is http or https.
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'set -euo pipefail' \
+    'endpoint="${YOLOBOX_OPEN_BRIDGE_ENDPOINT:-}"' \
+    'token="${YOLOBOX_OPEN_BRIDGE_TOKEN:-}"' \
+    'if [ -z "$endpoint" ] || [ -z "$token" ]; then' \
+    '    echo "yolobox open bridge is not enabled; start with --open-bridge" >&2' \
+    '    exit 1' \
+    'fi' \
+    'if [ "$#" -ne 1 ]; then' \
+    '    echo "usage: $(basename "$0") <http-or-https-url>" >&2' \
+    '    exit 2' \
+    'fi' \
+    'printf "%s" "$1" | curl -fsS -X POST -H "X-Yolobox-Open-Token: $token" --data-binary @- "$endpoint/open" >/dev/null' \
+    > /opt/yolobox/bin/yolobox-open \
+    && chmod +x /opt/yolobox/bin/yolobox-open \
+    && ln -s yolobox-open /opt/yolobox/bin/open \
+    && ln -s yolobox-open /opt/yolobox/bin/xdg-open
+
 # Claude wrapper
 RUN cp /opt/yolobox/wrapper-template /opt/yolobox/bin/claude \
     && echo 'exec "$REAL_BIN" --dangerously-skip-permissions "$@"' >> /opt/yolobox/bin/claude \

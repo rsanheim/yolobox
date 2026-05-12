@@ -53,6 +53,12 @@ yolobox help                # Show CLI help
 yolobox claude --docker --git-config --gh-token
 ```
 
+### Start an agent that can open host browser URLs
+
+```bash
+yolobox codex --open-bridge
+```
+
 ### Run one command in isolation
 
 ```bash

@@ -203,8 +203,9 @@ gh_token = true
 ssh_agent = true
 docker = true
 clipboard = true
+open_bridge = true
 network = "my_compose_network"
-# no_network = true # incompatible with network, pod, docker, and clipboard
+# no_network = true # incompatible with network, pod, docker, clipboard, and open_bridge
 no_env_passthrough = true
 no_yolo = true
 cpus = "4"
@@ -341,7 +342,7 @@ Both skills follow the standard Agent Skills layout so they can be validated and
 | `--no-env-passthrough` | Disable automatic host environment passthrough | |
 | `--setup` | Run interactive setup before starting | |
 | `--ssh-agent` | Forward SSH agent socket | |
-| `--no-network` | Disable network access | `--network`, `--pod`, `--docker`, `--clipboard` |
+| `--no-network` | Disable network access | `--network`, `--pod`, `--docker`, `--clipboard`, `--open-bridge` |
 | `--network <name>` | Join specific network (e.g., docker compose) | `--no-network`, `--pod` |
 | `--pod <name>` | Join existing Podman pod (shares its network) | `--no-network`, `--network`, `--docker` |
 | `--no-yolo` | Disable auto-confirmations (mindful mode) | |
@@ -357,6 +358,7 @@ Both skills follow the standard Agent Skills layout so they can be validated and
 | `--copy-agent-instructions` | Copy global agent instruction files and skills (see configuration below) | |
 | `--docker` | Mount Docker socket and join shared network (see notes below) | `--no-network`, `--pod` |
 | `--clipboard` | Bridge text clipboard copy/paste between the container and host | `--no-network` |
+| `--open-bridge` | Bridge `open`/`xdg-open` HTTP(S) URLs to the host browser | `--no-network` |
 | `--cpus <num>` | Limit CPUs available to the container (accepts fractions like `3.5`) | |
 | `--memory <limit>` | Hard memory limit (e.g., `8g`, `1024m`) | |
 | `--shm-size <size>` | Size of `/dev/shm` tmpfs (useful for browsers/playwright) | |
@@ -378,6 +380,8 @@ Both skills follow the standard Agent Skills layout so they can be validated and
 > **Docker access:** The `--docker` flag mounts the host Docker socket into the container and joins a shared `yolobox-net` network. This lets the AI agent run Docker commands (build images, start containers, use docker compose) that create sibling containers on the same network. The agent and any services it creates can communicate by container name. The network name is available inside the container as `$YOLOBOX_NETWORK`.
 
 > **Clipboard bridge:** `--clipboard` starts a short-lived host proxy and exposes text clipboard command shims (`pbcopy`, `pbpaste`, `xclip`, `xsel`, `wl-copy`, `wl-paste`) inside the container.
+
+> **Open bridge:** `--open-bridge` starts a short-lived host proxy and exposes `open` and `xdg-open` shims inside the container. The bridge only accepts `http://` and `https://` URLs and asks the host OS to open them in the default browser.
 
 > **Project filtering:** `--exclude` globs are evaluated relative to the project root. `--copy-as` destinations must already exist as files in the project. Both flags currently require `--readonly-project` and are incompatible with `--no-project`. Apple's `container` runtime does not support them yet.
 
@@ -430,6 +434,7 @@ If you're worried about an AI actively trying to escape containment, you need VM
 - Your project directory (it's mounted read-write by default)
 - Network access (use `--no-network` to disable, or `--network <name>` for specific networks)
 - Explicitly forwarded secrets or mounts (use `--no-env-passthrough` to suppress automatic env passthrough)
+- Host clipboard or browser actions when `--clipboard` or `--open-bridge` is enabled
 - The container itself (the AI has root via sudo)
 - Against kernel exploits or container escape vulnerabilities
 

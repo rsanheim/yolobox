@@ -279,6 +279,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  --no-project          Skip automatic project mount (caller provides mounts)")
 	fmt.Fprintln(os.Stderr, "  --docker              Mount Docker socket and join shared network")
 	fmt.Fprintln(os.Stderr, "  --clipboard           Bridge text clipboard copy/paste to the host")
+	fmt.Fprintln(os.Stderr, "  --open-bridge         Bridge open/xdg-open URLs to the host")
 	fmt.Fprintln(os.Stderr, "  --cpus <count>        Limit number of CPUs (supports fractions)")
 	fmt.Fprintln(os.Stderr, "  --memory <size>       Cap memory usage (e.g., 4g, 512m)")
 	fmt.Fprintln(os.Stderr, "  --shm-size <size>     Size of /dev/shm (e.g., 1g for Playwright)")
@@ -346,6 +347,7 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 		noProject             bool
 		docker                bool
 		clipboard             bool
+		openBridge            bool
 		setup                 bool
 		mounts                stringSliceFlag
 		excludes              stringSliceFlag
@@ -386,6 +388,7 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 	fs.BoolVar(&noProject, "no-project", false, "skip automatic project mount (caller provides mounts and workdir)")
 	fs.BoolVar(&docker, "docker", false, "mount Docker socket and join shared network")
 	fs.BoolVar(&clipboard, "clipboard", false, "bridge text clipboard copy/paste to the host")
+	fs.BoolVar(&openBridge, "open-bridge", false, "bridge open/xdg-open URLs to the host")
 	fs.BoolVar(&setup, "setup", false, "run interactive setup before starting")
 	fs.Var(&mounts, "mount", "extra mount src:dst")
 	fs.Var(&excludes, "exclude", "hide matching project paths from the container")
@@ -473,6 +476,9 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 	if clipboard {
 		cfg.Clipboard = true
 	}
+	if openBridge {
+		cfg.OpenBridge = true
+	}
 	if setup {
 		cfg.Setup = true
 	}
@@ -550,6 +556,9 @@ func validateConfigConflicts(cfg Config) error {
 	}
 	if cfg.Clipboard && cfg.NoNetwork {
 		return fmt.Errorf("cannot use --clipboard with --no-network")
+	}
+	if cfg.OpenBridge && cfg.NoNetwork {
+		return fmt.Errorf("cannot use --open-bridge with --no-network")
 	}
 	if cfg.NoProject {
 		if cfg.ReadonlyProject {
@@ -720,6 +729,17 @@ func runCommand(cfg Config, command []string, interactive bool) error {
 		cfg.ClipboardToken = clipboard.Token
 		info("Host clipboard bridge enabled")
 	}
+	var open *openBridge
+	if cfg.OpenBridge {
+		open, err = startOpenBridge(cfg.Runtime)
+		if err != nil {
+			return err
+		}
+		defer open.Close()
+		cfg.OpenBridgeEndpoint = open.Endpoint
+		cfg.OpenBridgeToken = open.Token
+		info("Host open bridge enabled")
+	}
 
 	// Ensure Docker network exists before starting container
 	if cfg.Docker {
@@ -859,6 +879,9 @@ func runSetup() (Config, error) {
 	if cfg.Clipboard {
 		selectedOptions = append(selectedOptions, "clipboard")
 	}
+	if cfg.OpenBridge {
+		selectedOptions = append(selectedOptions, "open_bridge")
+	}
 	if cfg.NoProject {
 		selectedOptions = append(selectedOptions, "no_project")
 	}
@@ -889,8 +912,9 @@ func runSetup() (Config, error) {
 					huh.NewOption("SSH agent (for git over SSH)", "ssh_agent"),
 					huh.NewOption("Docker socket (run containers from sandbox)", "docker"),
 					huh.NewOption("Host clipboard (text copy/paste bridge; requires network)", "clipboard"),
+					huh.NewOption("Host open bridge (open URLs in host browser; requires network)", "open_bridge"),
 					huh.NewOption("No automatic project mount (advanced; provide mounts/workdir)", "no_project"),
-					huh.NewOption("No network (disables network, pod, Docker, and clipboard)", "no_network"),
+					huh.NewOption("No network (disables network, pod, Docker, clipboard, and open bridge)", "no_network"),
 					huh.NewOption("No env passthrough (disable automatic host env vars)", "no_env_passthrough"),
 					huh.NewOption("No YOLO (disable auto-confirm in AI CLIs)", "no_yolo"),
 				).
@@ -970,6 +994,7 @@ func runSetup() (Config, error) {
 	cfg.SSHAgent = contains(selectedOptions, "ssh_agent")
 	cfg.Docker = contains(selectedOptions, "docker")
 	cfg.Clipboard = contains(selectedOptions, "clipboard")
+	cfg.OpenBridge = contains(selectedOptions, "open_bridge")
 	cfg.NoProject = contains(selectedOptions, "no_project")
 	cfg.NoNetwork = contains(selectedOptions, "no_network")
 	cfg.NoEnvPassthrough = contains(selectedOptions, "no_env_passthrough")
@@ -1028,8 +1053,8 @@ func splitToolArgs(args []string) (yoloboxArgs, toolArgs []string) {
 		"no-yolo": true, "scratch": true, "claude-config": true,
 		"codex-config": true, "gemini-config": true, "opencode-config": true, "git-config": true, "gh-token": true,
 		"copy-agent-instructions": true, "no-project": true, "docker": true, "setup": true, "mount": true,
-		"clipboard": true,
-		"exclude":   true, "copy-as": true,
+		"clipboard": true, "open-bridge": true,
+		"exclude": true, "copy-as": true,
 		"env": true, "h": true, "help": true,
 		"cpus": true, "memory": true, "shm-size": true, "gpus": true,
 		"device": true, "cap-add": true, "cap-drop": true, "runtime-arg": true,
@@ -1152,13 +1177,25 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 	if cfg.NoYolo {
 		args = append(args, "-e", "NO_YOLO=1")
 	}
+	hostBridgeRuntimeArgsAdded := false
 	if cfg.Clipboard {
 		args = append(args,
 			"-e", "YOLOBOX_CLIPBOARD=1",
 			"-e", "YOLOBOX_CLIPBOARD_ENDPOINT="+cfg.ClipboardEndpoint,
 			"-e", "YOLOBOX_CLIPBOARD_TOKEN="+cfg.ClipboardToken,
 		)
-		args = append(args, clipboardRuntimeArgs(cfg.Runtime)...)
+		args = append(args, hostBridgeRuntimeArgs(cfg.Runtime)...)
+		hostBridgeRuntimeArgsAdded = true
+	}
+	if cfg.OpenBridge {
+		args = append(args,
+			"-e", "YOLOBOX_OPEN_BRIDGE=1",
+			"-e", "YOLOBOX_OPEN_BRIDGE_ENDPOINT="+cfg.OpenBridgeEndpoint,
+			"-e", "YOLOBOX_OPEN_BRIDGE_TOKEN="+cfg.OpenBridgeToken,
+		)
+		if !hostBridgeRuntimeArgsAdded {
+			args = append(args, hostBridgeRuntimeArgs(cfg.Runtime)...)
+		}
 	}
 	if !cfg.NoEnvPassthrough {
 		if termEnv := os.Getenv("TERM"); termEnv != "" {

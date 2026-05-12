@@ -66,6 +66,12 @@ Bridge text clipboard copy/paste to the host:
 yolobox codex --clipboard
 ```
 
+Bridge URL opening to the host browser:
+
+```bash
+yolobox codex --open-bridge
+```
+
 ## Context handoff to the inside agent
 
 Every session provides a manifest at `/run/yolobox/context.json` and exports `YOLOBOX_CONTEXT_FILE`.

@@ -46,6 +46,7 @@ type Config struct {
 	NoProject             bool     `toml:"no_project"`
 	Docker                bool     `toml:"docker"`
 	Clipboard             bool     `toml:"clipboard"`
+	OpenBridge            bool     `toml:"open_bridge"`
 
 	CPUs        string          `toml:"cpus"`
 	Memory      string          `toml:"memory"`
@@ -61,8 +62,10 @@ type Config struct {
 	RebuildImage bool       `toml:"-"`
 	Fork         ForkConfig `toml:"-"`
 
-	ClipboardEndpoint string `toml:"-"`
-	ClipboardToken    string `toml:"-"`
+	ClipboardEndpoint  string `toml:"-"`
+	ClipboardToken     string `toml:"-"`
+	OpenBridgeEndpoint string `toml:"-"`
+	OpenBridgeToken    string `toml:"-"`
 }
 
 func defaultConfig() Config {
@@ -205,6 +208,9 @@ func mergeConfig(dst *Config, src Config) {
 	if src.Clipboard {
 		dst.Clipboard = true
 	}
+	if src.OpenBridge {
+		dst.OpenBridge = true
+	}
 
 	if src.CPUs != "" {
 		dst.CPUs = src.CPUs
@@ -264,6 +270,7 @@ func printConfig(cfg Config) error {
 	fmt.Printf("%sno_project:%s %t\n", colorBold, colorReset, cfg.NoProject)
 	fmt.Printf("%sdocker:%s %t\n", colorBold, colorReset, cfg.Docker)
 	fmt.Printf("%sclipboard:%s %t\n", colorBold, colorReset, cfg.Clipboard)
+	fmt.Printf("%sopen_bridge:%s %t\n", colorBold, colorReset, cfg.OpenBridge)
 
 	printStringConfigField("cpus", cfg.CPUs)
 	printStringConfigField("memory", cfg.Memory)
@@ -374,6 +381,9 @@ func saveGlobalConfig(cfg Config) error {
 	}
 	if cfg.Clipboard {
 		lines = append(lines, "clipboard = true")
+	}
+	if cfg.OpenBridge {
+		lines = append(lines, "open_bridge = true")
 	}
 	if cfg.Pod != "" {
 		lines = append(lines, fmt.Sprintf("pod = %q", cfg.Pod))
