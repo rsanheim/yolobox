@@ -364,6 +364,26 @@ RUN mkdir -p /host-claude /host-codex /host-gemini /host-opencode /host-git /hos
     '    /usr/local/bin/yolobox-upsert-block "$target" "$source_file" "$start_marker" "$end_marker"' \
     '    sudo chown yolo:yolo "$target"' \
     '}' \
+    'restore_codex_session_mtimes() {' \
+    '    local sessions_dir="${1:-/home/yolo/.codex/sessions}"' \
+    '    [ -d "$sessions_dir" ] || return 0' \
+    '    local file ts base stamp mtime' \
+    '    while IFS= read -r -d "" file; do' \
+    '        ts=""' \
+    '        if command -v jq >/dev/null 2>&1; then' \
+    '            ts="$(tail -n 20 "$file" 2>/dev/null | jq -r '\''select(.timestamp? != null) | .timestamp'\'' 2>/dev/null | tail -n 1 || true)"' \
+    '        fi' \
+    '        if [ -n "$ts" ] && [ "$ts" != "null" ]; then' \
+    '            touch -d "$ts" "$file" 2>/dev/null && continue' \
+    '        fi' \
+    '        base="${file##*/}"' \
+    '        stamp="${base#rollout-}"' \
+    '        if [[ "$stamp" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}- ]]; then' \
+    '            mtime="${stamp:0:4}${stamp:5:2}${stamp:8:2}${stamp:11:2}${stamp:14:2}.${stamp:17:2}"' \
+    '            touch -t "$mtime" "$file" 2>/dev/null || true' \
+    '        fi' \
+    '    done < <(find "$sessions_dir" -type f -name '\''rollout-*.jsonl'\'' -print0)' \
+    '}' \
     'warn_low_space() {' \
     '    local path="$1"' \
     '    local label="$2"' \
@@ -448,6 +468,7 @@ RUN mkdir -p /host-claude /host-codex /host-gemini /host-opencode /host-git /hos
     '        sudo mv -f "$CODEX_AUTH_BACKUP" /home/yolo/.codex/auth.json' \
     '    fi' \
     '    sudo chown -R yolo:yolo /home/yolo/.codex' \
+    '    restore_codex_session_mtimes /home/yolo/.codex/sessions' \
     'fi' \
     'if [ -f /home/yolo/.codex/auth.json ] && [ ! -s /home/yolo/.codex/auth.json ]; then' \
     '    echo -e "\033[33m→ Removing empty Codex auth file\033[0m" >&2' \

@@ -1232,9 +1232,19 @@ func TestDockerfileCodexConfigImportPreservesAuth(t *testing.T) {
 		"sudo mv -f /home/yolo/.codex/auth.json",
 		"sudo cp -a /host-codex/.codex/. /home/yolo/.codex/",
 		"sudo mv -f \"$CODEX_AUTH_BACKUP\" /home/yolo/.codex/auth.json",
+		"restore_codex_session_mtimes /home/yolo/.codex/sessions",
 	} {
 		if !strings.Contains(block, want) {
 			t.Fatalf("expected Codex config import block to contain %q", want)
+		}
+	}
+	for _, want := range []string{
+		"restore_codex_session_mtimes()",
+		"touch -d \"$ts\" \"$file\"",
+		"touch -t \"$mtime\" \"$file\"",
+	} {
+		if !strings.Contains(dockerfile, want) {
+			t.Fatalf("expected Dockerfile to contain %q", want)
 		}
 	}
 }

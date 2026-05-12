@@ -166,7 +166,7 @@ yolobox also injects a managed guidance block into `~/.claude/CLAUDE.md` and `~/
 ## Config sync warning
 
 ::: warning
-Setting `claude_config = true`, `codex_config = true`, `gemini_config = true`, or `opencode_config = true` in config copies your host config on every container start. Claude, Gemini, and OpenCode config sync replaces the matching in-container config directory, overwriting changes made inside the container. Codex config sync merges host files into `~/.codex` and preserves a valid in-container `auth.json` when the host copy has no usable auth file. Prefer `--claude-config`, `--codex-config`, `--gemini-config`, or `--opencode-config` for one-time syncs.
+Setting `claude_config = true`, `codex_config = true`, `gemini_config = true`, or `opencode_config = true` in config copies your host config on every container start. Claude, Gemini, and OpenCode config sync replaces the matching in-container config directory, overwriting changes made inside the container. Codex config sync merges host files into `~/.codex`, preserves a valid in-container `auth.json` when the host copy has no usable auth file, and restores imported session file mtimes from their session timestamps so old host sessions do not appear freshly created in resume lists. Prefer `--claude-config`, `--codex-config`, `--gemini-config`, or `--opencode-config` for one-time syncs.
 :::
 
 yolobox removes a zero-byte `/home/yolo/.codex/auth.json` during startup. Recent Codex versions fail with `EOF while parsing a value` when that stale file exists; removing it lets Codex recreate auth normally or show the sign-in flow.
