@@ -13,6 +13,7 @@ Do not use it for questions about the current environment from inside a running 
 
 1. Start from the user's intent, then choose the smallest `yolobox` command or flag set that accomplishes it.
 2. Check `yolobox config` when defaults, merged config, or flag precedence matter.
+   - If `default_harness` is set, bare `yolobox` launches that shortcut; use `yolobox shell` for an explicit shell.
 3. Prefer explicit isolation and safety flags:
    - `--scratch` for disposable or concurrent sessions that must not share `/home/yolo`.
    - `--readonly-project` when the agent only needs read access to the project tree.

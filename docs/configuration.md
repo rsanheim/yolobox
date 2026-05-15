@@ -13,6 +13,7 @@ Path: `~/.config/yolobox/config.toml`
 Applies to all projects:
 
 ```toml
+default_harness = "codex"
 git_config = true
 opencode_config = true
 gh_token = true
@@ -38,6 +39,7 @@ Path: `.yolobox.toml`
 Place in your project root for project-specific settings:
 
 ```toml
+default_harness = "none"
 mounts = ["../shared-libs:/libs:ro"]
 env = ["DEBUG=1"]
 readonly_project = true
@@ -54,6 +56,16 @@ packages = ["default-jdk", "maven"]
 ### Precedence
 
 CLI flags > project config > global config > defaults
+
+## Default harness
+
+Set `default_harness` to one AI shortcut name to make bare `yolobox` launch that tool:
+
+```toml
+default_harness = "codex"
+```
+
+Valid values are `claude`, `codex`, `gemini`, `opencode`, `copilot`, and `none`. Use `none` in project config to override a global default harness and keep bare `yolobox` as an interactive shell. `yolobox shell` always opens a shell regardless of this setting.
 
 ## Project file filtering
 

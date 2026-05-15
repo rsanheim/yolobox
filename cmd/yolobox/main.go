@@ -66,6 +66,8 @@ var toolShortcuts = []string{
 	"copilot",
 }
 
+const noDefaultHarness = "none"
+
 var sizePattern = regexp.MustCompile(`^\d+(?:\.\d+)?(?:[kKmMgGtTpP](?:i?[bB]?)?|[bB])?$`)
 var packageNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.+\-:]*$`)
 var versionPattern = regexp.MustCompile(`^v?\d+\.\d+\.\d+`)
@@ -121,6 +123,24 @@ func runCmd() error {
 
 func runCmdArgs(args []string, projectDir string, fork *ForkConfig) error {
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		fileCfg, err := loadConfig(projectDir)
+		if err != nil {
+			return err
+		}
+		if err := validateDefaultHarness(fileCfg.DefaultHarness); err != nil {
+			return err
+		}
+		if defaultHarness := normalizeDefaultHarness(fileCfg.DefaultHarness); defaultHarness != "" {
+			yoloboxArgs, toolArgs := splitToolArgs(args)
+			cfg, rest, err := parseBaseFlags(defaultHarness, yoloboxArgs, projectDir)
+			if err != nil {
+				return err
+			}
+			applyForkConfig(&cfg, fork)
+			allToolArgs := append(rest, toolArgs...)
+			return runToolShortcut(cfg, defaultHarness, allToolArgs)
+		}
+
 		cfg, rest, err := parseBaseFlags("yolobox", args, projectDir)
 		if err != nil {
 			return err
@@ -143,6 +163,16 @@ func runCmdArgs(args []string, projectDir string, fork *ForkConfig) error {
 			return fmt.Errorf("run requires a command")
 		}
 		return runCommand(cfg, rest, false)
+	case "shell":
+		cfg, rest, err := parseBaseFlags("shell", args[1:], projectDir)
+		if err != nil {
+			return err
+		}
+		applyForkConfig(&cfg, fork)
+		if len(rest) != 0 {
+			return fmt.Errorf("unexpected args: %v\n  Hint: use 'yolobox run <cmd...>' to run a command", rest)
+		}
+		return runShell(cfg)
 	case "fork":
 		return runFork(args[1:], projectDir)
 	case "setup":
@@ -189,14 +219,16 @@ func runCmdArgs(args []string, projectDir string, fork *ForkConfig) error {
 			// Combine any remaining args from flag parsing with tool args
 			allToolArgs := append(rest, toolArgs...)
 
-			// Print logo before running tool
-			fmt.Fprint(os.Stderr, colorCyan+logo+colorReset)
-			// Build command: tool name + any tool args
-			command := append([]string{toolName}, allToolArgs...)
-			return runCommand(cfg, command, false)
+			return runToolShortcut(cfg, toolName, allToolArgs)
 		}
 		return fmt.Errorf("unknown command: %s (try 'yolobox help')\n  Hint: if using flags, put them after the subcommand: yolobox run --flag cmd", args[0])
 	}
+}
+
+func runToolShortcut(cfg Config, toolName string, toolArgs []string) error {
+	fmt.Fprint(os.Stderr, colorCyan+logo+colorReset)
+	command := append([]string{toolName}, toolArgs...)
+	return runCommand(cfg, command, false)
 }
 
 func applyForkConfig(cfg *Config, fork *ForkConfig) {
@@ -237,7 +269,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  %sFull-power AI agents, host-safe by default.%s\n\n", colorYellow, colorReset)
 	fmt.Fprintf(os.Stderr, "  %sVersion:%s %s\n\n", colorBold, colorReset, Version)
 	fmt.Fprintf(os.Stderr, "%sUSAGE:%s\n", colorBold, colorReset)
-	fmt.Fprintln(os.Stderr, "  yolobox                     Start interactive shell in sandbox")
+	fmt.Fprintln(os.Stderr, "  yolobox                     Start default harness, or shell if none")
+	fmt.Fprintln(os.Stderr, "  yolobox shell               Start interactive shell in sandbox")
 	fmt.Fprintln(os.Stderr, "  yolobox run <cmd...>        Run a command in sandbox")
 	fmt.Fprintln(os.Stderr, "  yolobox fork --name <env> <cmd>  Run in a named copied folder with Compose namespace")
 	fmt.Fprintln(os.Stderr, "  yolobox setup               Configure yolobox settings")
@@ -295,6 +328,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "%sCONFIG:%s\n", colorBold, colorReset)
 	fmt.Fprintln(os.Stderr, "  Global:  ~/.config/yolobox/config.toml")
 	fmt.Fprintln(os.Stderr, "  Project: .yolobox.toml")
+	fmt.Fprintln(os.Stderr, "  default_harness = \"codex\"  # or claude, gemini, opencode, copilot, none")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintf(os.Stderr, "%sAUTO-FORWARDED ENV VARS:%s\n", colorBold, colorReset)
 	for _, line := range wrapCommaList(autoPassthroughEnvVars, 76) {
@@ -303,7 +337,8 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  Use --no-env-passthrough to disable automatic host env passthrough.")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintf(os.Stderr, "%sEXAMPLES:%s\n", colorBold, colorReset)
-	fmt.Fprintln(os.Stderr, "  yolobox                     # Drop into a shell")
+	fmt.Fprintln(os.Stderr, "  yolobox                     # Start default harness, or shell if none")
+	fmt.Fprintln(os.Stderr, "  yolobox shell               # Always drop into a shell")
 	fmt.Fprintln(os.Stderr, "  yolobox run make build      # Run make inside sandbox")
 	fmt.Fprintln(os.Stderr, "  yolobox fork --name bruno codex  # Developer env + Compose namespace")
 	fmt.Fprintln(os.Stderr, "  yolobox run claude          # Run Claude Code in sandbox")
@@ -548,6 +583,9 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 }
 
 func validateConfigConflicts(cfg Config) error {
+	if err := validateDefaultHarness(cfg.DefaultHarness); err != nil {
+		return err
+	}
 	if cfg.Network != "" && cfg.NoNetwork {
 		return fmt.Errorf("cannot use --network with --no-network")
 	}
@@ -832,6 +870,7 @@ func runSetup() (Config, error) {
 
 	// Form fields
 	var selectedOptions []string
+	defaultHarness := displayDefaultHarness(cfg.DefaultHarness)
 	podName := cfg.Pod
 	cpuLimit := cfg.CPUs
 	memoryLimit := cfg.Memory
@@ -899,6 +938,20 @@ func runSetup() (Config, error) {
 	fmt.Fprintln(os.Stderr)
 
 	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Default command for bare yolobox").
+				Description("Choose none to keep bare yolobox as an interactive shell").
+				Options(
+					huh.NewOption("None (interactive shell)", noDefaultHarness),
+					huh.NewOption("Claude", "claude"),
+					huh.NewOption("Codex", "codex"),
+					huh.NewOption("Gemini", "gemini"),
+					huh.NewOption("OpenCode", "opencode"),
+					huh.NewOption("Copilot", "copilot"),
+				).
+				Value(&defaultHarness),
+		),
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
 				Title("What do you want inside the box?").
@@ -985,6 +1038,7 @@ func runSetup() (Config, error) {
 	}
 
 	// Build config from form values
+	cfg.DefaultHarness = defaultHarness
 	cfg.GitConfig = contains(selectedOptions, "git_config")
 	cfg.ClaudeConfig = contains(selectedOptions, "claude_config")
 	cfg.CodexConfig = contains(selectedOptions, "codex_config")
@@ -1036,6 +1090,32 @@ func contains(slice []string, val string) bool {
 		}
 	}
 	return false
+}
+
+func normalizeDefaultHarness(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" || value == noDefaultHarness {
+		return ""
+	}
+	return value
+}
+
+func displayDefaultHarness(value string) string {
+	if harness := normalizeDefaultHarness(value); harness != "" {
+		return harness
+	}
+	return noDefaultHarness
+}
+
+func validateDefaultHarness(value string) error {
+	harness := normalizeDefaultHarness(value)
+	if harness == "" {
+		return nil
+	}
+	if !isToolShortcut(harness) {
+		return fmt.Errorf("invalid default_harness %q; expected one of: %s, %s", value, noDefaultHarness, strings.Join(toolShortcuts, ", "))
+	}
+	return nil
 }
 
 // isToolShortcut checks if a command is a tool shortcut

@@ -25,6 +25,56 @@ func argEnvValue(args []string, key string) (string, bool) {
 	return "", false
 }
 
+func installFakeDockerRuntime(t *testing.T) string {
+	t.Helper()
+
+	runtimeDir := t.TempDir()
+	argsFile := filepath.Join(t.TempDir(), "docker-args")
+	dockerPath := filepath.Join(runtimeDir, "docker")
+	script := `#!/bin/sh
+if [ "$1" = "info" ]; then
+	echo 8589934592
+	exit 0
+fi
+: > "$YOLOBOX_FAKE_RUNTIME_ARGS"
+for arg in "$@"; do
+	printf '%s\n' "$arg" >> "$YOLOBOX_FAKE_RUNTIME_ARGS"
+done
+exit 0
+`
+	if err := os.WriteFile(dockerPath, []byte(script), 0755); err != nil {
+		t.Fatalf("failed to write fake docker runtime: %v", err)
+	}
+	t.Setenv("PATH", runtimeDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("YOLOBOX_FAKE_RUNTIME_ARGS", argsFile)
+	return argsFile
+}
+
+func readFakeRuntimeArgs(t *testing.T, path string) []string {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read fake runtime args: %v", err)
+	}
+	return strings.Split(strings.TrimSpace(string(data)), "\n")
+}
+
+func silenceStderr(t *testing.T) func() {
+	t.Helper()
+
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatalf("failed to open %s: %v", os.DevNull, err)
+	}
+	oldStderr := os.Stderr
+	os.Stderr = devNull
+	return func() {
+		os.Stderr = oldStderr
+		_ = devNull.Close()
+	}
+}
+
 func TestDefaultConfig(t *testing.T) {
 	cfg := defaultConfig()
 	if cfg.Image != "ghcr.io/finbarr/yolobox:latest" {
@@ -32,6 +82,9 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if cfg.Runtime != "" {
 		t.Errorf("expected empty default runtime, got %s", cfg.Runtime)
+	}
+	if cfg.DefaultHarness != "" {
+		t.Errorf("expected empty default harness, got %s", cfg.DefaultHarness)
 	}
 }
 
@@ -41,6 +94,7 @@ func TestMergeConfig(t *testing.T) {
 		Image:   "old-image",
 	}
 	src := Config{
+		DefaultHarness:   "codex",
 		Image:            "new-image",
 		SSHAgent:         true,
 		NoNetwork:        true,
@@ -59,6 +113,9 @@ func TestMergeConfig(t *testing.T) {
 	}
 	if dst.Image != "new-image" {
 		t.Errorf("expected image to be new-image, got %s", dst.Image)
+	}
+	if dst.DefaultHarness != "codex" {
+		t.Errorf("expected default harness to be codex, got %s", dst.DefaultHarness)
 	}
 	if !dst.SSHAgent {
 		t.Error("expected SSHAgent to be true")
@@ -209,6 +266,59 @@ func TestLoadConfigOpencodeConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfigDefaultHarness(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	globalConfigPath := filepath.Join(globalConfigDir, "config.toml")
+	if err := os.WriteFile(globalConfigPath, []byte("default_harness = \"codex\"\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	cfg, err := loadConfig(projectDir)
+	if err != nil {
+		t.Fatalf("loadConfig failed: %v", err)
+	}
+	if cfg.DefaultHarness != "codex" {
+		t.Fatalf("expected default harness to load from config file, got %q", cfg.DefaultHarness)
+	}
+}
+
+func TestLoadConfigDefaultHarnessNoneOverridesGlobal(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(globalConfigDir, "config.toml"), []byte("default_harness = \"codex\"\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, ".yolobox.toml"), []byte("default_harness = \"none\"\n"), 0644); err != nil {
+		t.Fatalf("failed to write project config: %v", err)
+	}
+
+	cfg, err := loadConfig(projectDir)
+	if err != nil {
+		t.Fatalf("loadConfig failed: %v", err)
+	}
+	if cfg.DefaultHarness != "none" {
+		t.Fatalf("expected project default_harness=none to override global, got %q", cfg.DefaultHarness)
+	}
+	if normalizeDefaultHarness(cfg.DefaultHarness) != "" {
+		t.Fatalf("expected default_harness=none to resolve to no harness")
+	}
+}
+
 func TestSaveGlobalConfigToolConfigs(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
@@ -239,6 +349,36 @@ func TestSaveGlobalConfigToolConfigs(t *testing.T) {
 		if !strings.Contains(content, want) {
 			t.Fatalf("expected saved config to contain %q, got:\n%s", want, content)
 		}
+	}
+}
+
+func TestSaveGlobalConfigDefaultHarness(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+
+	if err := saveGlobalConfig(Config{DefaultHarness: "Codex"}); err != nil {
+		t.Fatalf("saveGlobalConfig failed: %v", err)
+	}
+
+	path := filepath.Join(configHome, "yolobox", "config.toml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	if !strings.Contains(string(data), "default_harness = \"codex\"") {
+		t.Fatalf("expected saved config to contain default_harness, got:\n%s", string(data))
+	}
+
+	if err := saveGlobalConfig(Config{DefaultHarness: "none"}); err != nil {
+		t.Fatalf("saveGlobalConfig failed: %v", err)
+	}
+	data, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	if strings.Contains(string(data), "default_harness") {
+		t.Fatalf("expected default_harness=none to be omitted from saved config, got:\n%s", string(data))
 	}
 }
 
@@ -1875,11 +2015,132 @@ func TestToolShortcuts(t *testing.T) {
 	}
 
 	// Check that non-tools are not shortcuts
-	nonTools := []string{"run", "help", "version", "setup", "foo"}
+	nonTools := []string{"run", "shell", "help", "version", "setup", "foo"}
 	for _, cmd := range nonTools {
 		if isToolShortcut(cmd) {
 			t.Errorf("expected %s NOT to be a tool shortcut", cmd)
 		}
+	}
+}
+
+func TestRunCmdArgsUsesDefaultHarness(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+	argsFile := installFakeDockerRuntime(t)
+	defer silenceStderr(t)()
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(globalConfigDir, "config.toml"), []byte("default_harness = \"codex\"\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	if err := runCmdArgs(nil, projectDir, nil); err != nil {
+		t.Fatalf("runCmdArgs failed: %v", err)
+	}
+
+	args := readFakeRuntimeArgs(t, argsFile)
+	if got := args[len(args)-1]; got != "codex" {
+		t.Fatalf("expected bare yolobox to run codex, got final runtime arg %q in %v", got, args)
+	}
+}
+
+func TestRunCmdArgsDefaultHarnessPassesToolFlags(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+	argsFile := installFakeDockerRuntime(t)
+	defer silenceStderr(t)()
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(globalConfigDir, "config.toml"), []byte("default_harness = \"codex\"\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	if err := runCmdArgs([]string{"-p", "hello"}, projectDir, nil); err != nil {
+		t.Fatalf("runCmdArgs failed: %v", err)
+	}
+
+	args := readFakeRuntimeArgs(t, argsFile)
+	if len(args) < 3 {
+		t.Fatalf("expected codex command with args, got %v", args)
+	}
+	got := args[len(args)-3:]
+	want := []string{"codex", "-p", "hello"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected final runtime args %v, got %v from %v", want, got, args)
+	}
+}
+
+func TestRunCmdArgsShellBypassesDefaultHarness(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+	argsFile := installFakeDockerRuntime(t)
+	defer silenceStderr(t)()
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(globalConfigDir, "config.toml"), []byte("default_harness = \"codex\"\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	if err := runCmdArgs([]string{"shell"}, projectDir, nil); err != nil {
+		t.Fatalf("runCmdArgs failed: %v", err)
+	}
+
+	args := readFakeRuntimeArgs(t, argsFile)
+	if got := args[len(args)-1]; got != "bash" {
+		t.Fatalf("expected yolobox shell to run bash, got final runtime arg %q in %v", got, args)
+	}
+}
+
+func TestRunCmdArgsDefaultHarnessNoneUsesShell(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+	argsFile := installFakeDockerRuntime(t)
+	defer silenceStderr(t)()
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(globalConfigDir, "config.toml"), []byte("default_harness = \"none\"\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	if err := runCmdArgs(nil, projectDir, nil); err != nil {
+		t.Fatalf("runCmdArgs failed: %v", err)
+	}
+
+	args := readFakeRuntimeArgs(t, argsFile)
+	if got := args[len(args)-1]; got != "bash" {
+		t.Fatalf("expected default_harness=none to run bash, got final runtime arg %q in %v", got, args)
+	}
+}
+
+func TestValidateDefaultHarness(t *testing.T) {
+	if err := validateDefaultHarness("codex"); err != nil {
+		t.Fatalf("expected codex default harness to validate: %v", err)
+	}
+	if err := validateDefaultHarness("none"); err != nil {
+		t.Fatalf("expected none default harness to validate: %v", err)
+	}
+	if err := validateDefaultHarness("vim"); err == nil {
+		t.Fatal("expected invalid default harness to fail validation")
 	}
 }
 

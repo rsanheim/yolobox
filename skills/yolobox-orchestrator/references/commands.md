@@ -26,6 +26,12 @@ yolobox claude
 yolobox gemini
 ```
 
+If `default_harness` is set to a shortcut such as `codex`, bare `yolobox` launches that tool. Use an explicit shell when you need manual access:
+
+```bash
+yolobox shell
+```
+
 ## Isolation controls
 
 Use a fresh home/cache state:

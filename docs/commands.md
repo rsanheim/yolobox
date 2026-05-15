@@ -14,6 +14,8 @@ yolobox copilot
 
 That is the intended path. You point the agent at a project and let it work inside the sandbox.
 
+If you use one tool most of the time, set `default_harness = "codex"` or another shortcut name in config. Then bare `yolobox` launches that tool. Set `default_harness = "none"` or leave it unset to keep bare `yolobox` as an interactive shell.
+
 ## Command reference
 
 ### AI shortcuts
@@ -31,7 +33,8 @@ These launch the matching tool inside yolobox and apply the tool-specific YOLO-m
 ### General commands
 
 ```bash
-yolobox                     # Open an interactive shell
+yolobox                     # Run configured default harness, or shell if none
+yolobox shell               # Open an interactive shell
 yolobox run <cmd...>        # Run a single command in the sandbox
 yolobox fork --name <env> <cmd...> # Run in a named copied folder with a Compose namespace
 yolobox fork resume <env> [cmd...] # Reopen an existing copied folder
@@ -117,4 +120,4 @@ Use `run` when you want one exact command in the same sandbox model.
 
 Use `fork` when you want concurrent sessions on the same project folder without sharing files or the default Compose project namespace.
 
-Use the bare `yolobox` shell when you are debugging or exploring manually, not as the main path.
+Use `yolobox shell` when you are debugging or exploring manually, not as the main path.

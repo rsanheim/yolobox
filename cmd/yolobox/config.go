@@ -24,6 +24,7 @@ type ForkConfig struct {
 type Config struct {
 	Runtime               string   `toml:"runtime"`
 	Image                 string   `toml:"image"`
+	DefaultHarness        string   `toml:"default_harness"`
 	Mounts                []string `toml:"mounts"`
 	Env                   []string `toml:"env"`
 	Exclude               []string `toml:"exclude"`
@@ -142,6 +143,9 @@ func mergeConfig(dst *Config, src Config) {
 	if src.Image != "" {
 		dst.Image = src.Image
 	}
+	if src.DefaultHarness != "" {
+		dst.DefaultHarness = strings.ToLower(strings.TrimSpace(src.DefaultHarness))
+	}
 	if len(src.Mounts) > 0 {
 		dst.Mounts = append([]string{}, src.Mounts...)
 	}
@@ -251,6 +255,7 @@ func printConfig(cfg Config) error {
 	}
 	fmt.Printf("%sruntime:%s %s\n", colorBold, colorReset, resolvedRuntimeName(cfg.Runtime))
 	fmt.Printf("%simage:%s %s\n", colorBold, colorReset, cfg.Image)
+	fmt.Printf("%sdefault_harness:%s %s\n", colorBold, colorReset, displayDefaultHarness(cfg.DefaultHarness))
 	fmt.Printf("%sproject:%s %s\n", colorBold, colorReset, projectDir)
 	fmt.Printf("%sssh_agent:%s %t\n", colorBold, colorReset, cfg.SSHAgent)
 	fmt.Printf("%sreadonly_project:%s %t\n", colorBold, colorReset, cfg.ReadonlyProject)
@@ -334,6 +339,9 @@ func saveGlobalConfig(cfg Config) error {
 	}
 
 	var lines []string
+	if harness := normalizeDefaultHarness(cfg.DefaultHarness); harness != "" {
+		lines = append(lines, fmt.Sprintf("default_harness = %q", harness))
+	}
 	if cfg.GitConfig {
 		lines = append(lines, "git_config = true")
 	}

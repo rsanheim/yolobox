@@ -46,6 +46,7 @@ yolobox claude    # Let it rip
 ```
 
 Or use any other AI tool: `yolobox codex`, `yolobox gemini`, `yolobox copilot`.
+Set `default_harness = "codex"` to make bare `yolobox` launch Codex; use `yolobox shell` when you want a manual shell.
 
 Non-interactive invocations keep stdout and stderr separate, so shell redirection works as expected:
 
@@ -160,7 +161,8 @@ yolobox opencode            # Run OpenCode
 yolobox copilot             # Run GitHub Copilot
 
 # General commands
-yolobox                     # Drop into interactive shell (for manual use)
+yolobox                     # Run configured default harness, or shell if none
+yolobox shell               # Drop into interactive shell (for manual use)
 yolobox run <cmd...>        # Run any command in sandbox
 yolobox fork --name <env> <cmd...> # Run in a named copied folder with a Compose namespace
 yolobox setup               # Configure yolobox settings
@@ -197,6 +199,7 @@ Run `yolobox setup` to configure your preferences with an interactive wizard.
 Settings are saved to `~/.config/yolobox/config.toml`:
 
 ```toml
+default_harness = "codex" # or claude, gemini, opencode, copilot, none
 git_config = true
 opencode_config = true
 gh_token = true
@@ -444,7 +447,7 @@ If you want a narrower view of the project, use `--exclude` and `--copy-as` to h
 
 **Level 1: Basic (default)**
 ```bash
-yolobox  # Standard container isolation
+yolobox claude  # Standard container isolation
 ```
 
 **Level 2: Reduced attack surface**
