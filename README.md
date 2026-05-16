@@ -568,11 +568,15 @@ Version is derived automatically from git tags via `git describe`:
 - After tag: `v0.1.1-3-gead833b` (3 commits after tag)
 - Uncommitted changes: adds `-dirty`
 
-**No files to edit for releases.** The Makefile handles it.
+The version string does not require a source edit. The Makefile derives it from Git tags.
 
 ### Releasing
 
 To release a new version:
+
+1. Update [CHANGELOG.md](CHANGELOG.md) with the release's user-facing changes.
+2. Commit the changelog update.
+3. Tag and push:
 
 ```bash
 git tag v0.1.2

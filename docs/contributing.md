@@ -73,9 +73,11 @@ Version comes from `git describe`:
 - later commit: `v0.1.1-3-gead833b`
 - local changes add `-dirty`
 
-The Makefile handles version stamping automatically.
+The Makefile handles version stamping automatically. The version string does not require a source edit.
 
 ## Releasing
+
+Before tagging, update the [changelog](https://github.com/finbarr/yolobox/blob/master/CHANGELOG.md) with the release's user-facing changes and commit it.
 
 ```bash
 git tag v0.1.2

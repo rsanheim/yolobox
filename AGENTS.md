@@ -47,7 +47,7 @@ make lint
 ./yolobox config
 ```
 
-Before any release or tag push, `make lint` is mandatory and must include the same `golangci-lint` coverage that CI runs. If local `make lint` reports `golangci-lint not installed, skipping`, install/run `golangci-lint` locally or run the CI linter equivalent before shipping.
+Before any release or tag push, update `CHANGELOG.md` with the release's user-facing changes. `make lint` is also mandatory and must include the same `golangci-lint` coverage that CI runs. If local `make lint` reports `golangci-lint not installed, skipping`, install/run `golangci-lint` locally or run the CI linter equivalent before shipping.
 
 Then run the feature you changed end-to-end. Examples:
 
