@@ -188,6 +188,7 @@ export default defineConfig({
         items: [
           { text: 'Security Model', link: '/security' },
           { text: 'Contributing', link: '/contributing' },
+          { text: 'Changelog', link: 'https://github.com/finbarr/yolobox/blob/master/CHANGELOG.md' },
         ]
       }
     ],

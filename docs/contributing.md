@@ -46,6 +46,7 @@ npm run docs:build
 - add tests for code changes
 - run the relevant verification before committing
 - keep documentation aligned with shipped behavior
+- update the [changelog](https://github.com/finbarr/yolobox/blob/master/CHANGELOG.md) for release-worthy changes
 
 ## Pull requests
 

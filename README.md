@@ -11,6 +11,8 @@
 
 Docs: [yolobox.dev](https://yolobox.dev)
 
+Changelog: [CHANGELOG.md](CHANGELOG.md)
+
 Run [Claude Code](https://claude.ai/code), [Codex](https://openai.com/codex/), or any AI coding agent in "yolo mode" without nuking your home directory.
 
 ## The Problem
