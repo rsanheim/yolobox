@@ -77,6 +77,7 @@ type contextConfigManifest struct {
 	PiConfig              bool                           `json:"pi_config"`
 	GitConfig             bool                           `json:"git_config"`
 	GhToken               bool                           `json:"gh_token"`
+	RTK                   bool                           `json:"rtk"`
 	CopyAgentInstructions bool                           `json:"copy_agent_instructions"`
 	Docker                bool                           `json:"docker"`
 	Clipboard             bool                           `json:"clipboard"`
@@ -181,6 +182,7 @@ func buildContextManifest(cfg Config, projectDir string, command []string, inter
 			PiConfig:              cfg.PiConfig,
 			GitConfig:             cfg.GitConfig,
 			GhToken:               cfg.GhToken,
+			RTK:                   cfg.RTK,
 			CopyAgentInstructions: cfg.CopyAgentInstructions,
 			Docker:                cfg.Docker,
 			Clipboard:             cfg.Clipboard,

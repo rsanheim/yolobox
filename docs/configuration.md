@@ -18,6 +18,7 @@ git_config = true
 opencode_config = true
 pi_config = true
 gh_token = true
+rtk = true
 ssh_agent = true
 docker = true
 clipboard = true
@@ -128,6 +129,12 @@ Set `clipboard = true` or pass `--clipboard` to bridge text clipboard copy/paste
 Set `open_bridge = true` or pass `--open-bridge` to bridge URL opening from the container to the host. yolobox starts a short-lived host proxy for the session and exposes `open` and `xdg-open` shims inside the container.
 
 The bridge only accepts `http://` and `https://` URLs and asks the host OS to open them in the default browser. `open_bridge = true` cannot be combined with `no_network = true`.
+
+## RTK command compression
+
+Set `rtk = true` or pass `--rtk` to enable RTK command-output compression for supported AI shortcuts. yolobox installs the latest RTK release available when the base image is built, then runs RTK init inside the container for Claude, Codex, Gemini, or OpenCode after any host config sync.
+
+yolobox does not auto-update RTK at startup. To get a newer RTK release, rebuild or pull a newer yolobox image. Copilot and Pi are not auto-initialized because RTK does not currently provide a matching non-project config hook for them.
 
 ## Global agent instructions {#global-agent-instructions}
 

@@ -15,6 +15,8 @@ The base image is meant to be useful immediately without turning into a giant ki
 
 Claude and Codex sessions also get a built-in `yolobox` skill that helps the agent orient itself to the trusted sandbox it is running in, then reads `/run/yolobox/context.json` and describes the active environment. yolobox also injects managed guidance into their user instruction files so they know when to use that skill. The host-side `yolobox-orchestrator` skill lives in the repo's `skills/` directory but is not auto-installed inside the container because it is meant for agents running outside yolobox.
 
+RTK is also preinstalled for opt-in command-output compression. Pass `--rtk` or set `rtk = true` to initialize it for Claude, Codex, Gemini, or OpenCode inside the container.
+
 ### Runtimes
 
 - Node.js 22
@@ -39,6 +41,7 @@ npm is upgraded during the image build using npm's date-based `--before` filter,
 - fzf
 - jq
 - vim
+- RTK
 
 Need something else? The agent has sudo inside the container. If it needs a package manager, runtime, database client, or build dependency, it can install it.
 

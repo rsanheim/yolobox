@@ -64,6 +64,12 @@ yolobox claude --docker --git-config --gh-token
 yolobox codex --open-bridge
 ```
 
+### Start an agent with RTK compression
+
+```bash
+yolobox codex --rtk
+```
+
 ### Run one command in isolation
 
 ```bash

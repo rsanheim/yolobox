@@ -103,6 +103,7 @@ func TestMergeConfig(t *testing.T) {
 		CodexConfig:      true,
 		OpencodeConfig:   true,
 		PiConfig:         true,
+		RTK:              true,
 		Clipboard:        true,
 		OpenBridge:       true,
 	}
@@ -138,6 +139,9 @@ func TestMergeConfig(t *testing.T) {
 	}
 	if !dst.PiConfig {
 		t.Error("expected PiConfig to be true")
+	}
+	if !dst.RTK {
+		t.Error("expected RTK to be true")
 	}
 	if !dst.Clipboard {
 		t.Error("expected Clipboard to be true")
@@ -294,6 +298,30 @@ func TestLoadConfigPiConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfigRTK(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+
+	globalConfigDir := filepath.Join(configHome, "yolobox")
+	if err := os.MkdirAll(globalConfigDir, 0755); err != nil {
+		t.Fatalf("failed to create global config dir: %v", err)
+	}
+	globalConfigPath := filepath.Join(globalConfigDir, "config.toml")
+	if err := os.WriteFile(globalConfigPath, []byte("rtk = true\n"), 0644); err != nil {
+		t.Fatalf("failed to write global config: %v", err)
+	}
+
+	cfg, err := loadConfig(projectDir)
+	if err != nil {
+		t.Fatalf("loadConfig failed: %v", err)
+	}
+	if !cfg.RTK {
+		t.Fatal("expected rtk to load from config file")
+	}
+}
+
 func TestLoadConfigDefaultHarness(t *testing.T) {
 	projectDir := t.TempDir()
 	configHome := t.TempDir()
@@ -358,6 +386,7 @@ func TestSaveGlobalConfigToolConfigs(t *testing.T) {
 		GeminiConfig:   true,
 		OpencodeConfig: true,
 		PiConfig:       true,
+		RTK:            true,
 	}
 	if err := saveGlobalConfig(cfg); err != nil {
 		t.Fatalf("saveGlobalConfig failed: %v", err)
@@ -375,6 +404,7 @@ func TestSaveGlobalConfigToolConfigs(t *testing.T) {
 		"gemini_config = true",
 		"opencode_config = true",
 		"pi_config = true",
+		"rtk = true",
 	} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("expected saved config to contain %q, got:\n%s", want, content)
@@ -859,6 +889,7 @@ func TestBuildRunArgsContextManifestContents(t *testing.T) {
 		GeminiConfig:       true,
 		OpencodeConfig:     true,
 		PiConfig:           true,
+		RTK:                true,
 		Clipboard:          true,
 		ClipboardEndpoint:  "http://host.docker.internal:12345",
 		ClipboardToken:     "test-token",
@@ -962,6 +993,9 @@ func TestBuildRunArgsContextManifestContents(t *testing.T) {
 	}
 	if !manifest.Config.PiConfig {
 		t.Fatal("expected pi_config in manifest config")
+	}
+	if !manifest.Config.RTK {
+		t.Fatal("expected rtk in manifest config")
 	}
 	if !manifest.Config.Clipboard {
 		t.Fatal("expected clipboard in manifest config")
@@ -1233,6 +1267,65 @@ func TestBuildRunArgsNoYolo(t *testing.T) {
 	}
 	if !strings.Contains(argsStr, "NO_YOLO=1") {
 		t.Error("expected NO_YOLO=1 env var to be present")
+	}
+}
+
+func TestRTKTargetForCommand(t *testing.T) {
+	tests := []struct {
+		command []string
+		want    string
+	}{
+		{[]string{"claude"}, "claude"},
+		{[]string{"/usr/local/bin/codex", "--version"}, "codex"},
+		{[]string{"gemini", "--help"}, "gemini"},
+		{[]string{"opencode"}, "opencode"},
+		{[]string{"copilot"}, ""},
+		{[]string{"bash"}, ""},
+		{nil, ""},
+	}
+
+	for _, tt := range tests {
+		if got := rtkTargetForCommand(tt.command); got != tt.want {
+			t.Fatalf("rtkTargetForCommand(%v) = %q, want %q", tt.command, got, tt.want)
+		}
+	}
+}
+
+func TestBuildRunArgsRTK(t *testing.T) {
+	cfg := Config{
+		Image: "test-image",
+		RTK:   true,
+	}
+
+	args, _, err := buildRunArgs(cfg, "/test/project", []string{"codex", "--version"}, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if value, ok := argEnvValue(args, "YOLOBOX_RTK"); !ok || value != "1" {
+		t.Fatalf("expected YOLOBOX_RTK=1, got value=%q ok=%t args=%v", value, ok, args)
+	}
+	if value, ok := argEnvValue(args, "YOLOBOX_RTK_TARGET"); !ok || value != "codex" {
+		t.Fatalf("expected YOLOBOX_RTK_TARGET=codex, got value=%q ok=%t args=%v", value, ok, args)
+	}
+}
+
+func TestBuildRunArgsRTKUnsupportedCommand(t *testing.T) {
+	cfg := Config{
+		Image: "test-image",
+		RTK:   true,
+	}
+
+	args, _, err := buildRunArgs(cfg, "/test/project", []string{"bash", "-lc", "true"}, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if value, ok := argEnvValue(args, "YOLOBOX_RTK"); !ok || value != "1" {
+		t.Fatalf("expected YOLOBOX_RTK=1, got value=%q ok=%t args=%v", value, ok, args)
+	}
+	if value, ok := argEnvValue(args, "YOLOBOX_RTK_TARGET"); ok {
+		t.Fatalf("did not expect YOLOBOX_RTK_TARGET for unsupported command, got %q in %v", value, args)
 	}
 }
 
@@ -1562,6 +1655,28 @@ func TestDockerfileConfiguresNpmReleaseAgeGate(t *testing.T) {
 	}
 	if upgrade >= envGate || envGate >= devTools || envGate >= aiTools {
 		t.Fatalf("expected npm age gate before later npm installs")
+	}
+}
+
+func TestDockerfileConfiguresRTK(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read Dockerfile: %v", err)
+	}
+	dockerfile := string(data)
+
+	for _, want := range []string{
+		"https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/develop/install.sh",
+		"RTK_INSTALL_DIR=/usr/local/bin",
+		"enable_rtk()",
+		"YOLOBOX_RTK_TARGET",
+		"rtk init -g --codex",
+		"rtk init -g --opencode",
+		"enable_rtk",
+	} {
+		if !strings.Contains(dockerfile, want) {
+			t.Fatalf("expected Dockerfile to contain %q", want)
+		}
 	}
 }
 
@@ -2631,6 +2746,12 @@ func TestSplitToolArgs(t *testing.T) {
 			wantTool:    []string{"--resume"},
 		},
 		{
+			name:        "rtk flag stays with yolobox",
+			args:        []string{"--rtk", "--resume"},
+			wantYolobox: []string{"--rtk"},
+			wantTool:    []string{"--resume"},
+		},
+		{
 			name:        "multiple yolobox flags then tool args",
 			args:        []string{"--no-network", "--scratch", "--resume", "abc123"},
 			wantYolobox: []string{"--no-network", "--scratch"},
@@ -2750,6 +2871,17 @@ func TestParseFlagsPiConfig(t *testing.T) {
 		t.Fatal("expected PiConfig to be true after parsing --pi-config")
 	}
 	expectSliceEqual(t, rest, []string{"pi", "--version"})
+}
+
+func TestParseFlagsRTK(t *testing.T) {
+	cfg, rest, err := parseBaseFlags("run", []string{"--rtk", "codex", "--version"}, t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.RTK {
+		t.Fatal("expected RTK to be true after parsing --rtk")
+	}
+	expectSliceEqual(t, rest, []string{"codex", "--version"})
 }
 
 func TestParseFlagsClipboard(t *testing.T) {

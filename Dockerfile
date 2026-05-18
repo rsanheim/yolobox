@@ -421,6 +421,43 @@ RUN mkdir -p /host-claude /host-codex /host-codex-sessions /host-gemini /host-op
     '        echo -e "\033[33m→ Low free space for $label (${available_kb}KB available); Codex auth and other CLI writes may fail with '\''No space left on device'\''\033[0m" >&2' \
     '    fi' \
     '}' \
+    'enable_rtk() {' \
+    '    [ "${YOLOBOX_RTK:-}" = "1" ] || return 0' \
+    '    if ! command -v rtk >/dev/null 2>&1; then' \
+    '        echo -e "\033[33m→ RTK requested but rtk is not installed in this image\033[0m" >&2' \
+    '        return 0' \
+    '    fi' \
+    '    local target="${YOLOBOX_RTK_TARGET:-}"' \
+    '    if [ -z "$target" ]; then' \
+    '        echo -e "\033[33m→ RTK enabled; no supported AI shortcut target detected\033[0m" >&2' \
+    '        return 0' \
+    '    fi' \
+    '    local output status=0' \
+    '    case "$target" in' \
+    '        claude)' \
+    '            output="$(rtk init -g --auto-patch 2>&1)" || status=$?' \
+    '            ;;' \
+    '        codex)' \
+    '            output="$(rtk init -g --codex 2>&1)" || status=$?' \
+    '            ;;' \
+    '        gemini)' \
+    '            output="$(rtk init -g --gemini --auto-patch 2>&1)" || status=$?' \
+    '            ;;' \
+    '        opencode)' \
+    '            output="$(rtk init -g --opencode 2>&1)" || status=$?' \
+    '            ;;' \
+    '        *)' \
+    '            echo -e "\033[33m→ RTK enabled, but $target is not supported by yolobox auto-init\033[0m" >&2' \
+    '            return 0' \
+    '            ;;' \
+    '    esac' \
+    '    if [ "$status" = "0" ]; then' \
+    '        echo -e "\033[33m→ RTK command compression enabled for $target\033[0m" >&2' \
+    '    else' \
+    '        echo -e "\033[33m→ Failed to enable RTK for $target\033[0m" >&2' \
+    '        [ -n "$output" ] && printf "%s\n" "$output" >&2' \
+    '    fi' \
+    '}' \
     '' \
     'warn_low_space /home/yolo /home/yolo' \
     'warn_low_space /tmp /tmp' \
@@ -620,6 +657,9 @@ RUN mkdir -p /host-claude /host-codex /host-codex-sessions /host-gemini /host-op
     '    echo -e "\033[33m→ Copying global agent instructions and skills to container\033[0m" >&2' \
     'fi' \
     '' \
+    '# Enable RTK after host config sync so its in-container hooks are not overwritten' \
+    'enable_rtk' \
+    '' \
     '# Install built-in yolobox skill from the image (named volume may shadow /home/yolo)' \
     'if [ -d /opt/yolobox/skills/yolobox ]; then' \
     '    mkdir -p /home/yolo/.codex/skills /home/yolo/.claude/skills' \
@@ -712,6 +752,10 @@ RUN NPM_CONFIG_PREFIX="" npm install -g --no-audit --no-fund \
     @github/copilot \
     @earendil-works/pi-coding-agent \
     && NPM_CONFIG_PREFIX="" npm cache clean --force
+
+# RTK command-output compression proxy. Intentionally not pinned: the base image
+# captures the latest RTK release available when yolobox is built.
+RUN curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/develop/install.sh | RTK_INSTALL_DIR=/usr/local/bin sh
 USER yolo
 
 # Copy Claude Code from installer stage

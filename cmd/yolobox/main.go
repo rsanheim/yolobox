@@ -330,6 +330,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  --pi-config           Copy host Pi config to container")
 	fmt.Fprintln(os.Stderr, "  --git-config          Copy host git config to container")
 	fmt.Fprintln(os.Stderr, "  --gh-token            Forward GitHub token for gh and HTTPS git")
+	fmt.Fprintln(os.Stderr, "  --rtk                 Enable RTK command-output compression for supported AI CLIs")
 	fmt.Fprintln(os.Stderr, "  --copy-agent-instructions  Copy global agent instructions and skills")
 	fmt.Fprintln(os.Stderr, "  --no-project          Skip automatic project mount (caller provides mounts)")
 	fmt.Fprintln(os.Stderr, "  --docker              Mount Docker socket and join shared network")
@@ -401,6 +402,7 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 		piConfig              bool
 		gitConfig             bool
 		ghToken               bool
+		rtk                   bool
 		copyAgentInstructions bool
 		noProject             bool
 		docker                bool
@@ -443,6 +445,7 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 	fs.BoolVar(&piConfig, "pi-config", false, "copy host Pi config to container")
 	fs.BoolVar(&gitConfig, "git-config", false, "copy host git config to container")
 	fs.BoolVar(&ghToken, "gh-token", false, "forward GitHub CLI token (from gh auth token)")
+	fs.BoolVar(&rtk, "rtk", false, "enable RTK command-output compression for supported AI CLIs")
 	fs.BoolVar(&copyAgentInstructions, "copy-agent-instructions", false, "copy agent instruction files and skills")
 	fs.BoolVar(&noProject, "no-project", false, "skip automatic project mount (caller provides mounts and workdir)")
 	fs.BoolVar(&docker, "docker", false, "mount Docker socket and join shared network")
@@ -525,6 +528,9 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 	}
 	if ghToken {
 		cfg.GhToken = true
+	}
+	if rtk {
+		cfg.RTK = true
 	}
 	if copyAgentInstructions {
 		cfg.CopyAgentInstructions = true
@@ -950,6 +956,9 @@ func runSetup() (Config, error) {
 	if cfg.GhToken {
 		selectedOptions = append(selectedOptions, "gh_token")
 	}
+	if cfg.RTK {
+		selectedOptions = append(selectedOptions, "rtk")
+	}
 	if cfg.SSHAgent {
 		selectedOptions = append(selectedOptions, "ssh_agent")
 	}
@@ -1013,6 +1022,7 @@ func runSetup() (Config, error) {
 					huh.NewOption("OpenCode config (copy ~/.config/opencode)", "opencode_config"),
 					huh.NewOption("Pi config (copy ~/.pi/agent)", "pi_config"),
 					huh.NewOption("GitHub token (gh + HTTPS git auth)", "gh_token"),
+					huh.NewOption("RTK compression (supported AI CLIs)", "rtk"),
 					huh.NewOption("SSH agent (for git over SSH)", "ssh_agent"),
 					huh.NewOption("Docker socket (run containers from sandbox)", "docker"),
 					huh.NewOption("Host clipboard (text copy/paste bridge; requires network)", "clipboard"),
@@ -1097,6 +1107,7 @@ func runSetup() (Config, error) {
 	cfg.OpencodeConfig = contains(selectedOptions, "opencode_config")
 	cfg.PiConfig = contains(selectedOptions, "pi_config")
 	cfg.GhToken = contains(selectedOptions, "gh_token")
+	cfg.RTK = contains(selectedOptions, "rtk")
 	cfg.SSHAgent = contains(selectedOptions, "ssh_agent")
 	cfg.Docker = contains(selectedOptions, "docker")
 	cfg.Clipboard = contains(selectedOptions, "clipboard")
@@ -1183,7 +1194,7 @@ func splitToolArgs(args []string) (yoloboxArgs, toolArgs []string) {
 		"runtime": true, "image": true, "network": true, "pod": true,
 		"ssh-agent": true, "readonly-project": true, "no-network": true, "no-env-passthrough": true,
 		"no-yolo": true, "scratch": true, "claude-config": true,
-		"codex-config": true, "gemini-config": true, "opencode-config": true, "pi-config": true, "git-config": true, "gh-token": true,
+		"codex-config": true, "gemini-config": true, "opencode-config": true, "pi-config": true, "git-config": true, "gh-token": true, "rtk": true,
 		"copy-agent-instructions": true, "no-project": true, "docker": true, "setup": true, "mount": true,
 		"clipboard": true, "open-bridge": true,
 		"exclude": true, "copy-as": true,
@@ -1239,6 +1250,18 @@ func splitToolArgs(args []string) (yoloboxArgs, toolArgs []string) {
 	}
 
 	return yoloboxArgs, nil
+}
+
+func rtkTargetForCommand(command []string) string {
+	if len(command) == 0 {
+		return ""
+	}
+	switch target := filepath.Base(command[0]); target {
+	case "claude", "codex", "gemini", "opencode":
+		return target
+	default:
+		return ""
+	}
 }
 
 func buildRunArgs(cfg Config, projectDir string, command []string, interactive bool) ([]string, []string, error) {
@@ -1314,6 +1337,12 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 
 	if cfg.NoYolo {
 		args = append(args, "-e", "NO_YOLO=1")
+	}
+	if cfg.RTK {
+		args = append(args, "-e", "YOLOBOX_RTK=1")
+		if target := rtkTargetForCommand(command); target != "" {
+			args = append(args, "-e", "YOLOBOX_RTK_TARGET="+target)
+		}
 	}
 	hostBridgeRuntimeArgsAdded := false
 	if cfg.Clipboard {

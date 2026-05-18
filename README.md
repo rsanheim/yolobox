@@ -64,6 +64,7 @@ The base image comes batteries-included:
 - **Build tools**: make, cmake, gcc
 - **Git** + **GitHub CLI**
 - **Common utilities**: ripgrep, fd, fzf, jq, vim
+- **Agent utilities**: RTK command-output compression proxy, opt in with `--rtk`
 
 npm is configured with a 7-day release-age gate. During the base image build, yolobox first upgrades npm using npm's date-based `--before` filter, then sets `NPM_CONFIG_MIN_RELEASE_AGE=7` so later npm/npx installs skip package versions published in the last week.
 
@@ -87,6 +88,12 @@ No confirmations, no guardrails—just pure unfiltered AI, the way nature intend
 OpenCode and Pi do not have dedicated yolo flags yet, but they still run inside the yolobox sandbox.
 
 For Codex, yolobox pins approval and sandbox mode explicitly so upstream trust defaults and Linux sandbox backend changes do not change the wrapper behavior.
+
+### RTK Command Compression
+
+Pass `--rtk` or set `rtk = true` to enable [RTK](https://github.com/rtk-ai/rtk) command-output compression for supported AI shortcuts. yolobox installs the latest RTK release when the base image is built, then runs RTK init inside the container for Claude, Codex, Gemini, or OpenCode after any host config sync.
+
+yolobox does not auto-update RTK at container startup. To pick up a newer RTK release, rebuild or pull a newer yolobox image. Copilot and Pi are not auto-initialized because RTK does not currently provide a matching non-project config hook for them.
 
 ## Project-Level Container Customization
 
@@ -214,6 +221,7 @@ git_config = true
 opencode_config = true
 pi_config = true
 gh_token = true
+rtk = true
 ssh_agent = true
 docker = true
 clipboard = true
@@ -389,6 +397,7 @@ Both skills follow the standard Agent Skills layout so they can be validated and
 | `--pi-config` | Copy host `~/.pi/agent` config into container | |
 | `--git-config` | Copy host `~/.gitconfig` into container | |
 | `--gh-token` | Forward GitHub token for `gh` and HTTPS Git auth (extracts from keychain via `gh auth token`) | |
+| `--rtk` | Enable RTK command-output compression for supported AI CLIs | |
 | `--copy-agent-instructions` | Copy global agent instruction files and skills (see configuration below) | |
 | `--docker` | Mount Docker socket and join shared network (see notes below) | `--no-network`, `--pod` |
 | `--clipboard` | Bridge text clipboard copy/paste between the container and host | `--no-network` |

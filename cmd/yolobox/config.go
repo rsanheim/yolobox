@@ -45,6 +45,7 @@ type Config struct {
 	PiConfig              bool     `toml:"pi_config"`
 	GitConfig             bool     `toml:"git_config"`
 	GhToken               bool     `toml:"gh_token"`
+	RTK                   bool     `toml:"rtk"`
 	CopyAgentInstructions bool     `toml:"copy_agent_instructions"`
 	NoProject             bool     `toml:"no_project"`
 	Docker                bool     `toml:"docker"`
@@ -210,6 +211,9 @@ func mergeConfig(dst *Config, src Config) {
 	if src.GhToken {
 		dst.GhToken = true
 	}
+	if src.RTK {
+		dst.RTK = true
+	}
 	if src.CopyAgentInstructions {
 		dst.CopyAgentInstructions = true
 	}
@@ -282,6 +286,7 @@ func printConfig(cfg Config) error {
 	fmt.Printf("%spi_config:%s %t\n", colorBold, colorReset, cfg.PiConfig)
 	fmt.Printf("%sgit_config:%s %t\n", colorBold, colorReset, cfg.GitConfig)
 	fmt.Printf("%sgh_token:%s %t\n", colorBold, colorReset, cfg.GhToken)
+	fmt.Printf("%srtk:%s %t\n", colorBold, colorReset, cfg.RTK)
 	fmt.Printf("%scopy_agent_instructions:%s %t\n", colorBold, colorReset, cfg.CopyAgentInstructions)
 	fmt.Printf("%sno_project:%s %t\n", colorBold, colorReset, cfg.NoProject)
 	fmt.Printf("%sdocker:%s %t\n", colorBold, colorReset, cfg.Docker)
@@ -373,6 +378,9 @@ func saveGlobalConfig(cfg Config) error {
 	}
 	if cfg.GhToken {
 		lines = append(lines, "gh_token = true")
+	}
+	if cfg.RTK {
+		lines = append(lines, "rtk = true")
 	}
 	if len(cfg.Exclude) > 0 {
 		lines = append(lines, fmt.Sprintf("exclude = %s", formatTomlStringSlice(cfg.Exclude)))

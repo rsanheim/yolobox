@@ -34,6 +34,7 @@ Flags go after the subcommand: `yolobox run --flag cmd` or `yolobox claude --fla
 | `--pi-config` | Copy host `~/.pi/agent` config into the container | |
 | `--git-config` | Copy host `~/.gitconfig` into the container | |
 | `--gh-token` | Forward GitHub token for `gh` and HTTPS Git auth from `gh auth token` | |
+| `--rtk` | Enable RTK command-output compression for supported AI CLIs | |
 | `--copy-agent-instructions` | Copy global instruction files and skills into the container | |
 | `--clipboard` | Bridge text clipboard copy/paste between the container and host | `--no-network` |
 | `--open-bridge` | Bridge `open`/`xdg-open` HTTP(S) URLs to the host browser | `--no-network` |
@@ -81,6 +82,12 @@ By default, yolobox uses the runtime's normal bridged network.
 yolobox automatically passes a short list of common API/token environment variables when they exist on the host, plus `TERM`, `LANG`, and detected `TZ` for terminal usability.
 
 Use `--no-env-passthrough` to disable those automatic host-derived environment variables. Explicit `--env KEY=value` entries still pass through, and `--gh-token` still forwards a GitHub token when requested.
+
+## RTK command compression
+
+The `--rtk` flag enables RTK command-output compression for supported AI shortcuts. yolobox runs RTK init inside the container for Claude, Codex, Gemini, or OpenCode after any host config sync, so copied host config does not overwrite the RTK hooks.
+
+RTK is installed in the base image at image build time using the latest available RTK release. yolobox does not auto-update RTK during container startup; pull or rebuild the yolobox image to pick up newer RTK releases.
 
 ## Docker access {#docker-access}
 
