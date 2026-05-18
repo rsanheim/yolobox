@@ -47,7 +47,7 @@ make lint
 ./yolobox config
 ```
 
-Before any release or tag push, update `CHANGELOG.md` with the release's user-facing changes. `make lint` is also mandatory and must include the same `golangci-lint` coverage that CI runs. If local `make lint` reports `golangci-lint not installed, skipping`, install/run `golangci-lint` locally or run the CI linter equivalent before shipping.
+Before any release or tag push, update `CHANGELOG.md` with the release's user-facing changes. Release tags must be created only from a clean, up-to-date `master` branch; do not tag feature branches, and push only `master` plus the specific release tag. `make lint` is also mandatory and must include the same `golangci-lint` coverage that CI runs. If local `make lint` reports `golangci-lint not installed, skipping`, install/run `golangci-lint` locally or run the CI linter equivalent before shipping.
 
 Then run the feature you changed end-to-end. Examples:
 
@@ -129,3 +129,4 @@ Also update [README.md](README.md), the docs site under [docs/](docs/), and the 
 - Do not create yolobox runtime metadata directories inside the project checkout. For small container handoff data like the context manifest, pass it through the entrypoint and materialize it in-container instead of bind-mounting a host temp directory from the repo.
 - Local `make lint` skips `golangci-lint` when it is not installed, but CI runs `golangci-lint-action` with the latest linter. A skipped local linter is not release-ready; before release pushes, install/run `golangci-lint` locally or run the CI linter equivalent.
 - npm's `min-release-age` requires a new enough npm. When enforcing npm package age in the base image, first upgrade npm with the older `--before` date filter, then set `NPM_CONFIG_MIN_RELEASE_AGE` for the rest of the build and runtime.
+- Release tags must only be created from a clean, up-to-date `master` branch. Push `master` and the specific release tag together, for example `git push origin master refs/tags/v0.1.2`; avoid broad `git push --tags` from feature branches.

@@ -582,11 +582,14 @@ To release a new version:
 
 1. Update [CHANGELOG.md](CHANGELOG.md) with the release's user-facing changes.
 2. Commit the changelog update.
-3. Tag and push:
+3. Switch to `master`, verify it is clean and up to date, then tag and push only `master` plus the new release tag. Never tag a feature branch, and do not use `git push --tags` from a non-release branch.
 
 ```bash
+git switch master
+git pull --ff-only origin master
+git status --short --branch
 git tag v0.1.2
-git push origin master --tags
+git push origin master refs/tags/v0.1.2
 ```
 
 That's it. GitHub Actions will automatically:

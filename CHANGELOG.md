@@ -8,6 +8,10 @@ there is no `v0.6.0` tag in this repository.
 
 ## Unreleased
 
+### Changed
+
+- Documented that releases must be tagged only from a clean, up-to-date `master` branch and pushed with the specific release tag.
+
 ## v0.17.1 - 2026-05-17
 
 ### Added

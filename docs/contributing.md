@@ -79,9 +79,14 @@ The Makefile handles version stamping automatically. The version string does not
 
 Before tagging, update the [changelog](https://github.com/finbarr/yolobox/blob/master/CHANGELOG.md) with the release's user-facing changes and commit it.
 
+Only tag releases from `master`. Before creating the tag, switch to `master`, fast-forward it from `origin/master`, and verify the working tree is clean. Do not tag feature branches, and do not use `git push --tags` from a non-release branch.
+
 ```bash
+git switch master
+git pull --ff-only origin master
+git status --short --branch
 git tag v0.1.2
-git push origin master --tags
+git push origin master refs/tags/v0.1.2
 ```
 
 GitHub Actions builds release binaries, creates the GitHub release, and publishes the container image.
