@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/term"
 )
@@ -73,6 +74,27 @@ func silenceStderr(t *testing.T) func() {
 		os.Stderr = oldStderr
 		_ = devNull.Close()
 	}
+}
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	oldStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+	os.Stderr = w
+	fn()
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("io.ReadAll() error = %v", err)
+	}
+	_ = r.Close()
+	return string(out)
 }
 
 func TestDefaultConfig(t *testing.T) {
@@ -2193,6 +2215,103 @@ func TestComparableVersion(t *testing.T) {
 	}
 }
 
+func TestSummarizeReleaseBodyPrefersCuratedSections(t *testing.T) {
+	body := `## v0.18.0 - 2026-05-18
+
+### Added
+
+- Added concise release summaries to update prompts.
+- Added ` + "`yolobox upgrade --check`" + `.
+
+### Fixed
+
+- Fixed release note drift.
+`
+
+	got := summarizeReleaseBody(body, 3)
+	want := []string{
+		"Added concise release summaries to update prompts.",
+		"Added `yolobox upgrade --check`.",
+		"Fixed release note drift.",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("summarizeReleaseBody() = %#v, want %#v", got, want)
+	}
+}
+
+func TestSummarizeReleaseBodyCleansGeneratedNotes(t *testing.T) {
+	body := `## What's Changed
+* Add RTK support by @finbarr in https://github.com/finbarr/yolobox/pull/50
+* Fix config sync by @finbarr in https://github.com/finbarr/yolobox/pull/51
+* Full Changelog: https://github.com/finbarr/yolobox/compare/v0.17.1...v0.18.0
+`
+
+	got := summarizeReleaseBody(body, 3)
+	want := []string{
+		"Add RTK support",
+		"Fix config sync",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("summarizeReleaseBody() = %#v, want %#v", got, want)
+	}
+}
+
+func TestVersionCacheRequiresReleaseMetadata(t *testing.T) {
+	fresh := time.Now()
+	if versionCacheUsable(versionCache{LatestVersion: "0.18.0", CheckedAt: fresh}) {
+		t.Fatal("old cache without release metadata should be refreshed")
+	}
+	if !versionCacheUsable(versionCache{LatestVersion: "0.18.0", ReleaseURL: "https://example.com/release", CheckedAt: fresh}) {
+		t.Fatal("fresh cache with release metadata should be usable")
+	}
+}
+
+func TestShowUpdateMessageIncludesReleaseNotes(t *testing.T) {
+	oldVersion := Version
+	Version = "v0.17.0"
+	t.Cleanup(func() {
+		Version = oldVersion
+	})
+
+	output := captureStderr(t, func() {
+		showUpdateMessage(releaseInfo{
+			Version: "0.18.0",
+			URL:     "https://github.com/finbarr/yolobox/releases/tag/v0.18.0",
+			Notes: []string{
+				"Added release summaries.",
+				"Added upgrade --check.",
+			},
+		})
+	})
+
+	for _, want := range []string{
+		"yolobox v0.18.0 available",
+		"What's new:",
+		"- Added release summaries.",
+		"- Added upgrade --check.",
+		"yolobox upgrade",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected update message to contain %q, got:\n%s", want, output)
+		}
+	}
+}
+
+func TestShowUpdateMessageSkipsCurrentVersion(t *testing.T) {
+	oldVersion := Version
+	Version = "v0.18.0"
+	t.Cleanup(func() {
+		Version = oldVersion
+	})
+
+	output := captureStderr(t, func() {
+		showUpdateMessage(releaseInfo{Version: "0.18.0", Notes: []string{"Nope"}})
+	})
+	if output != "" {
+		t.Fatalf("expected no update message for current version, got:\n%s", output)
+	}
+}
+
 func TestIsNewerVersion(t *testing.T) {
 	tests := []struct {
 		latest  string
@@ -2209,6 +2328,51 @@ func TestIsNewerVersion(t *testing.T) {
 	for _, tt := range tests {
 		if got := isNewerVersion(tt.latest, tt.current); got != tt.want {
 			t.Errorf("isNewerVersion(%q, %q) = %t, want %t", tt.latest, tt.current, got, tt.want)
+		}
+	}
+}
+
+func TestParseUpgradeOptions(t *testing.T) {
+	opts, err := parseUpgradeOptions([]string{"--check"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !opts.Check {
+		t.Fatal("expected check option")
+	}
+
+	_, err = parseUpgradeOptions([]string{"extra"})
+	if err == nil {
+		t.Fatal("expected unexpected arg error")
+	}
+}
+
+func TestPrintUpgradeCheckIncludesReleaseNotes(t *testing.T) {
+	oldVersion := Version
+	Version = "v0.17.0"
+	t.Cleanup(func() {
+		Version = oldVersion
+	})
+
+	output := captureStderr(t, func() {
+		err := printUpgradeCheck(releaseInfo{
+			Version: "0.18.0",
+			URL:     "https://github.com/finbarr/yolobox/releases/tag/v0.18.0",
+			Notes:   []string{"Added release summaries."},
+		}, "0.17.0")
+		if err != nil {
+			t.Fatalf("printUpgradeCheck failed: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"New version available: 0.18.0",
+		"What's new:",
+		"- Added release summaries.",
+		"yolobox upgrade",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected upgrade check output to contain %q, got:\n%s", want, output)
 		}
 	}
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 func resetVolumes(args []string) error {
@@ -114,38 +114,57 @@ func execCommand(bin string, args []string) error {
 	return cmd.Run()
 }
 
-type githubRelease struct {
-	TagName string `json:"tag_name"`
-	Assets  []struct {
-		Name               string `json:"name"`
-		BrowserDownloadURL string `json:"browser_download_url"`
-	} `json:"assets"`
+type upgradeOptions struct {
+	Check bool
 }
 
-func upgradeYolobox() error {
+func parseUpgradeOptions(args []string) (upgradeOptions, error) {
+	fs := flag.NewFlagSet("upgrade", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	check := fs.Bool("check", false, "check latest release without upgrading")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			printUsage()
+			return upgradeOptions{}, errHelp
+		}
+		return upgradeOptions{}, err
+	}
+	if len(fs.Args()) != 0 {
+		return upgradeOptions{}, fmt.Errorf("unexpected args: %v", fs.Args())
+	}
+	return upgradeOptions{Check: *check}, nil
+}
+
+func upgradeYolobox(args []string) error {
+	opts, err := parseUpgradeOptions(args)
+	if err != nil {
+		return err
+	}
+
 	info("Checking for updates...")
 
-	resp, err := http.Get("https://api.github.com/repos/finbarr/yolobox/releases/latest")
+	client := &http.Client{Timeout: 30 * time.Second}
+	release, err := fetchLatestRelease(client)
 	if err != nil {
 		return fmt.Errorf("failed to check for updates: %w", err)
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
 
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("failed to check for updates: HTTP %d", resp.StatusCode)
+	latestVersion := latestVersionFromRelease(release)
+	if latestVersion == "" {
+		return fmt.Errorf("latest release is missing a tag")
 	}
-
-	var release githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return fmt.Errorf("failed to parse release info: %w", err)
-	}
-
-	latestVersion := strings.TrimPrefix(release.TagName, "v")
 	currentVersion := strings.TrimPrefix(Version, "v")
+	latest := releaseInfo{
+		Version: latestVersion,
+		URL:     releaseURL(release),
+		Notes:   releaseSummary(release),
+	}
 
-	if latestVersion == currentVersion {
+	if opts.Check {
+		return printUpgradeCheck(latest, currentVersion)
+	}
+
+	if !isNewerVersion(latestVersion, Version) {
 		success("Already at latest version (%s)", Version)
 	} else {
 		info("New version available: %s (current: %s)", latestVersion, currentVersion)
@@ -211,6 +230,7 @@ func upgradeYolobox() error {
 		}
 
 		success("Binary upgraded to %s", latestVersion)
+		printPostUpgradeNotes(latest)
 	}
 
 	info("Pulling latest Docker image...")
@@ -225,4 +245,34 @@ func upgradeYolobox() error {
 
 	success("Upgrade complete!")
 	return nil
+}
+
+func printUpgradeCheck(latest releaseInfo, currentVersion string) error {
+	if isNewerVersion(latest.Version, Version) {
+		info("New version available: %s (current: %s)", latest.Version, currentVersion)
+		printReleaseNotes(os.Stderr, latest.Notes)
+		if latest.URL != "" {
+			fmt.Fprintf(os.Stderr, "   Release: %s\n", latest.URL)
+		}
+		fmt.Fprintf(os.Stderr, "   Run %syolobox upgrade%s to update\n", colorBold, colorReset)
+		return nil
+	}
+
+	success("Already at latest version (%s)", Version)
+	if latest.URL != "" {
+		fmt.Fprintf(os.Stderr, "   Latest release: %s\n", latest.URL)
+	}
+	return nil
+}
+
+func printPostUpgradeNotes(latest releaseInfo) {
+	if len(latest.Notes) == 0 && latest.URL == "" {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "\n%sUpgraded to yolobox v%s%s\n", colorGreen, latest.Version, colorReset)
+	printReleaseNotes(os.Stderr, latest.Notes)
+	if latest.URL != "" {
+		fmt.Fprintf(os.Stderr, "   Release: %s\n", latest.URL)
+	}
+	fmt.Fprintln(os.Stderr, "")
 }

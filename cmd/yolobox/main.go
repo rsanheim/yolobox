@@ -200,7 +200,7 @@ func runCmdArgs(args []string, projectDir string, fork *ForkConfig) error {
 		_, err := runSetup()
 		return err
 	case "upgrade":
-		return upgradeYolobox()
+		return upgradeYolobox(args[1:])
 	case "config":
 		cfg, rest, err := parseBaseFlags("config", args[1:], projectDir)
 		if err != nil {
@@ -295,7 +295,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  yolobox run <cmd...>        Run a command in sandbox")
 	fmt.Fprintln(os.Stderr, "  yolobox fork --name <env> <cmd>  Run in a named copied folder with Compose namespace")
 	fmt.Fprintln(os.Stderr, "  yolobox setup               Configure yolobox settings")
-	fmt.Fprintln(os.Stderr, "  yolobox upgrade             Upgrade binary and pull latest image")
+	fmt.Fprintln(os.Stderr, "  yolobox upgrade [--check]   Upgrade binary/image, or inspect latest release")
 	fmt.Fprintln(os.Stderr, "  yolobox config              Print resolved configuration")
 	fmt.Fprintln(os.Stderr, "  yolobox reset --force       Remove named volumes (fresh start)")
 	fmt.Fprintln(os.Stderr, "  yolobox uninstall --force   Uninstall yolobox completely")

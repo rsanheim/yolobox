@@ -44,6 +44,7 @@ yolobox fork discard <env> --force # Delete a copied folder
 yolobox setup               # Write global defaults to ~/.config/yolobox/config.toml
 yolobox config              # Print the resolved config for the current project
 yolobox upgrade             # Update the binary and pull the latest base image
+yolobox upgrade --check     # Show latest release notes without upgrading
 yolobox reset --force       # Remove yolobox named volumes
 yolobox uninstall --force   # Remove yolobox binary, image, and volumes
 yolobox version             # Print version and platform
@@ -119,6 +120,14 @@ yolobox config
 ```bash
 YOLOBOX_TIMING=1 yolobox run true
 ```
+
+### Inspect the latest release before upgrading
+
+```bash
+yolobox upgrade --check
+```
+
+The check prints the current version, latest version, and a short summary from the release notes without downloading a binary or pulling the image.
 
 ### Reset persistent state
 

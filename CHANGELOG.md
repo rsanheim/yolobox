@@ -8,8 +8,14 @@ there is no `v0.6.0` tag in this repository.
 
 ## Unreleased
 
+### Added
+
+- Added concise release summaries to update prompts and post-upgrade output.
+- Added `yolobox upgrade --check` to inspect the latest release without changing the binary or image.
+
 ### Changed
 
+- GitHub releases now use the curated `CHANGELOG.md` section for the release body so CLI update prompts can show human-written notes.
 - Documented that releases must be tagged only from a clean, up-to-date `master` branch and pushed with the specific release tag.
 
 ## v0.17.1 - 2026-05-17

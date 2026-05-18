@@ -184,6 +184,7 @@ yolobox run <cmd...>        # Run any command in sandbox
 yolobox fork --name <env> <cmd...> # Run in a named copied folder with a Compose namespace
 yolobox setup               # Configure yolobox settings
 yolobox upgrade             # Update binary and pull latest image
+yolobox upgrade --check     # Show latest release notes without upgrading
 yolobox config              # Show resolved configuration
 yolobox reset --force       # Delete volumes (fresh start)
 yolobox version             # Show version
@@ -603,7 +604,7 @@ git push origin master refs/tags/v0.1.2
 
 That's it. GitHub Actions will automatically:
 1. Build binaries for linux/darwin × amd64/arm64
-2. Create a GitHub release with binaries and checksums
+2. Create a GitHub release with binaries, checksums, and the matching `CHANGELOG.md` section as release notes
 3. Build and push Docker image to `ghcr.io/finbarr/yolobox`
 
 **Version policy:**

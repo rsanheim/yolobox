@@ -77,7 +77,7 @@ The Makefile handles version stamping automatically. The version string does not
 
 ## Releasing
 
-Before tagging, update the [changelog](https://github.com/finbarr/yolobox/blob/master/CHANGELOG.md) with the release's user-facing changes and commit it.
+Before tagging, update the [changelog](https://github.com/finbarr/yolobox/blob/master/CHANGELOG.md) with the release's user-facing changes and commit it. The release workflow uses that tag's changelog section as the GitHub release body, and yolobox uses that release body for update prompts, `yolobox upgrade --check`, and post-upgrade notes.
 
 Only tag releases from `master`. Before creating the tag, switch to `master`, fast-forward it from `origin/master`, and verify the working tree is clean. Do not tag feature branches, and do not use `git push --tags` from a non-release branch.
 
