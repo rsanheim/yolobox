@@ -24,7 +24,7 @@ RTK is also preinstalled for opt-in command-output compression. Pass `--rtk` or 
 - Go
 - Bun
 
-npm is upgraded during the image build using npm's date-based `--before` filter, then configured with `NPM_CONFIG_MIN_RELEASE_AGE=7`. Later npm/npx installs during the image build and inside yolobox skip package versions published in the last week.
+npm is upgraded during the image build using npm's date-based `--before` filter. yolobox's own later npm/npx installs in that image build run with `NPM_CONFIG_MIN_RELEASE_AGE=7`, but the finished box does not keep the release-age setting at runtime.
 
 ### Build tools
 

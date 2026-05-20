@@ -83,12 +83,8 @@ RUN set -eux; \
     mv "$tmp/package" /usr/lib/node_modules/npm; \
     ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm; \
     ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx; \
-    npm config set --global min-release-age "${NPM_MIN_RELEASE_AGE_DAYS}"; \
     npm cache clean --force; \
     rm -rf "$tmp"
-
-# Applies to all later npm/npx installs during image builds and inside yolobox.
-ENV NPM_CONFIG_MIN_RELEASE_AGE=${NPM_MIN_RELEASE_AGE_DAYS}
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
@@ -129,7 +125,7 @@ RUN ln -s /usr/bin/batcat /usr/local/bin/bat && \
     ln -s /usr/bin/fdfind /usr/local/bin/fd
 
 # Install stable dev tools (change rarely, separated from AI CLIs)
-RUN npm install -g --no-audit --no-fund \
+RUN NPM_CONFIG_MIN_RELEASE_AGE="${NPM_MIN_RELEASE_AGE_DAYS}" npm install -g --no-audit --no-fund \
     typescript \
     ts-node \
     yarn \
@@ -302,8 +298,6 @@ COPY skills /opt/yolobox/skills
 COPY agent-instructions /opt/yolobox/agent-instructions
 
 # Configure npm to use a user-writable prefix so yolo can `npm install -g` without sudo.
-# NPM_CONFIG_MIN_RELEASE_AGE remains set above so runtime npm installs avoid
-# package versions published in the last NPM_MIN_RELEASE_AGE_DAYS days.
 ENV NPM_CONFIG_PREFIX=/home/yolo/.npm-global
 
 # Add wrapper dir, npm-global bin, and ~/.local/bin to PATH (wrappers take priority)
@@ -745,7 +739,7 @@ RUN echo 'echo ""' >> ~/.bashrc \
 # NPM_CONFIG_PREFIX is set above for runtime user installs; unset it here
 # so these install to the default system location like the dev tools.
 USER root
-RUN NPM_CONFIG_PREFIX="" npm install -g --no-audit --no-fund \
+RUN NPM_CONFIG_PREFIX="" NPM_CONFIG_MIN_RELEASE_AGE="${NPM_MIN_RELEASE_AGE_DAYS}" npm install -g --no-audit --no-fund \
     @google/gemini-cli \
     @openai/codex \
     opencode-ai \

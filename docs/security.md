@@ -108,4 +108,4 @@ That makes rootless Podman a strong default if security matters more than conven
 
 ## npm package freshness
 
-The base image configures npm with `NPM_CONFIG_MIN_RELEASE_AGE=7`. npm and npx installs during the image build, in derived images, and inside yolobox avoid package versions published in the last week. The Dockerfile upgrades npm first using npm's date-based `--before` filter so release builds can keep npm current without trusting a just-published npm package.
+The base image build runs yolobox's own npm/npx installs with `NPM_CONFIG_MIN_RELEASE_AGE=7`, so image contents avoid package versions published in the last week. The Dockerfile upgrades npm first using npm's date-based `--before` filter so release builds can keep npm current without trusting a just-published npm package. The finished box does not keep that npm config, so runtime npm/npx installs, CLI upgrades, and derived Dockerfile fragments are unrestricted by default unless you explicitly set npm's release-age config yourself.

@@ -66,7 +66,7 @@ The base image comes batteries-included:
 - **Common utilities**: ripgrep, fd, fzf, jq, vim
 - **Agent utilities**: RTK command-output compression proxy, opt in with `--rtk`
 
-npm is configured with a 7-day release-age gate. During the base image build, yolobox first upgrades npm using npm's date-based `--before` filter, then sets `NPM_CONFIG_MIN_RELEASE_AGE=7` so later npm/npx installs skip package versions published in the last week.
+During the base image build, yolobox applies a 7-day npm release-age gate to its own npm installs. It first upgrades npm using npm's date-based `--before` filter, then runs the built-in npm/npx installs with `NPM_CONFIG_MIN_RELEASE_AGE=7` so image contents do not come from package versions published in the last week. The finished box does not keep that npm setting, so runtime npm/npx installs and CLI self-updates work normally.
 
 Need something else? The AI has sudo.
 
@@ -140,7 +140,7 @@ yolobox run --packages default-jdk --rebuild-image java --version
 
 The first run builds a derived image. Later runs reuse it until the base image or customization inputs change. When you use a Dockerfile fragment, yolobox asks Docker/Podman to build again so context changes are noticed, but cached layers are reused when nothing changed.
 
-Derived images inherit `NPM_CONFIG_MIN_RELEASE_AGE=7` from the base image, so npm/npx commands in Dockerfile fragments and inside yolobox avoid package versions published in the last week unless you explicitly override the npm config.
+The base image's npm release-age gate is scoped to yolobox's own image build. Derived Dockerfile fragments and live yolobox sessions do not inherit `NPM_CONFIG_MIN_RELEASE_AGE`, so user-controlled npm/npx commands can install or update normally unless you explicitly set that npm config yourself.
 
 This also keeps `yolobox upgrade` relatively painless:
 

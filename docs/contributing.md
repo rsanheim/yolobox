@@ -16,7 +16,7 @@ make test
 
 If you are working on the docs site branch, you also need Node.js to build the VitePress site.
 
-yolobox release images set npm's `min-release-age` to 7 days. If you install npm dependencies while developing locally and want to mirror the release-image behavior, use:
+yolobox release image builds run their npm installs with npm's `min-release-age` set to 7 days. If you install npm dependencies while developing locally and want to mirror the release-image build behavior, use:
 
 ```bash
 npm install --min-release-age=7

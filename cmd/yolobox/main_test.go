@@ -1108,7 +1108,7 @@ func TestDescribeYoloboxContextReportsManifestProjectAccess(t *testing.T) {
 
 	cmd := exec.Command("bash", yoloboxSkillContextScriptPath(t))
 	cmd.Dir = projectDir
-	cmd.Env = append(os.Environ(), "YOLOBOX_CONTEXT_FILE="+contextPath, "NPM_CONFIG_MIN_RELEASE_AGE=7")
+	cmd.Env = append(os.Environ(), "YOLOBOX_CONTEXT_FILE="+contextPath, "NPM_CONFIG_MIN_RELEASE_AGE=")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("context script failed: %v\n%s", err, out)
@@ -1120,11 +1120,13 @@ func TestDescribeYoloboxContextReportsManifestProjectAccess(t *testing.T) {
 		"Automatic project mount: true",
 		"Readonly project mode: false",
 		"Project writable now: true",
-		"npm min release age: 7 days",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected %q in output:\n%s", want, output)
 		}
+	}
+	if strings.Contains(output, "npm min release age:") {
+		t.Fatalf("did not expect a runtime npm release-age gate by default:\n%s", output)
 	}
 }
 
@@ -1194,7 +1196,7 @@ func TestDescribeYoloboxContextFallbackUsesProjectAccessBeforeOutputPath(t *test
 		"YOLOBOX_CONTEXT_FILE="+filepath.Join(t.TempDir(), "missing.json"),
 		"YOLOBOX_PROJECT_PATH="+projectDir,
 		"YOLOBOX_OUTPUT_PATH="+outputDir,
-		"NPM_CONFIG_MIN_RELEASE_AGE=7",
+		"NPM_CONFIG_MIN_RELEASE_AGE=",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -1207,11 +1209,13 @@ func TestDescribeYoloboxContextFallbackUsesProjectAccessBeforeOutputPath(t *test
 		"Automatic project mount: unknown",
 		"Readonly project mode: false",
 		"Project writable now: true",
-		"npm min release age: 7 days",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected %q in output:\n%s", want, output)
 		}
+	}
+	if strings.Contains(output, "npm min release age:") {
+		t.Fatalf("did not expect a runtime npm release-age gate by default:\n%s", output)
 	}
 	if strings.Contains(output, "Output: "+outputDir) {
 		t.Fatalf("did not expect fallback to report output path for writable project:\n%s", output)
@@ -1660,23 +1664,30 @@ func TestDockerfileConfiguresNpmReleaseAgeGate(t *testing.T) {
 		"--before=\"$(date -u -d \"${NPM_MIN_RELEASE_AGE_DAYS} days ago\" +%Y-%m-%dT%H:%M:%SZ)\"",
 		"rm -rf /usr/lib/node_modules/npm",
 		"mv \"$tmp/package\" /usr/lib/node_modules/npm",
-		"npm config set --global min-release-age \"${NPM_MIN_RELEASE_AGE_DAYS}\"",
-		"ENV NPM_CONFIG_MIN_RELEASE_AGE=${NPM_MIN_RELEASE_AGE_DAYS}",
+		"RUN NPM_CONFIG_MIN_RELEASE_AGE=\"${NPM_MIN_RELEASE_AGE_DAYS}\" npm install -g --no-audit --no-fund \\\n    typescript",
+		"RUN NPM_CONFIG_PREFIX=\"\" NPM_CONFIG_MIN_RELEASE_AGE=\"${NPM_MIN_RELEASE_AGE_DAYS}\" npm install -g --no-audit --no-fund",
 	} {
 		if !strings.Contains(dockerfile, want) {
 			t.Fatalf("expected Dockerfile to contain %q", want)
 		}
 	}
+	for _, unwanted := range []string{
+		"npm config set --global min-release-age",
+		"ENV NPM_CONFIG_MIN_RELEASE_AGE",
+	} {
+		if strings.Contains(dockerfile, unwanted) {
+			t.Fatalf("did not expect Dockerfile to persist runtime npm release-age config with %q", unwanted)
+		}
+	}
 
 	upgrade := strings.Index(dockerfile, "npm pack \"npm@latest\"")
-	devTools := strings.Index(dockerfile, "RUN npm install -g --no-audit --no-fund \\\n    typescript")
-	aiTools := strings.Index(dockerfile, "RUN NPM_CONFIG_PREFIX=\"\" npm install -g --no-audit --no-fund")
-	envGate := strings.Index(dockerfile, "ENV NPM_CONFIG_MIN_RELEASE_AGE=${NPM_MIN_RELEASE_AGE_DAYS}")
-	if upgrade < 0 || devTools < 0 || aiTools < 0 || envGate < 0 {
+	devTools := strings.Index(dockerfile, "RUN NPM_CONFIG_MIN_RELEASE_AGE=\"${NPM_MIN_RELEASE_AGE_DAYS}\" npm install -g --no-audit --no-fund \\\n    typescript")
+	aiTools := strings.Index(dockerfile, "RUN NPM_CONFIG_PREFIX=\"\" NPM_CONFIG_MIN_RELEASE_AGE=\"${NPM_MIN_RELEASE_AGE_DAYS}\" npm install -g --no-audit --no-fund")
+	if upgrade < 0 || devTools < 0 || aiTools < 0 {
 		t.Fatalf("failed to locate npm install ordering in Dockerfile")
 	}
-	if upgrade >= envGate || envGate >= devTools || envGate >= aiTools {
-		t.Fatalf("expected npm age gate before later npm installs")
+	if upgrade >= devTools || upgrade >= aiTools {
+		t.Fatalf("expected npm upgrade before build-time age-gated npm installs")
 	}
 }
 
