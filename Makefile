@@ -60,12 +60,12 @@ smoke-test: build
 		echo "  ✗ pi"; \
 		failed=1; \
 	fi; \
-	IMG_VER=$$(./$(BINARY) run --scratch /usr/local/bin/claude --version 2>/dev/null | head -1); \
-	RUN_VER=$$(./$(BINARY) run claude --version 2>/dev/null | head -1); \
-	if [ "$$IMG_VER" = "$$RUN_VER" ]; then \
-		echo "  ✓ claude version pinned ($$RUN_VER)"; \
+	REAL_VER=$$(./$(BINARY) run --scratch env NO_YOLO=1 claude --version 2>/dev/null | head -1); \
+	WRAP_VER=$$(./$(BINARY) run --scratch claude --version 2>/dev/null | head -1); \
+	if [ "$$REAL_VER" = "$$WRAP_VER" ]; then \
+		echo "  ✓ claude wrapper matches real binary ($$WRAP_VER)"; \
 	else \
-		echo "  ✗ claude version mismatch: image=$$IMG_VER, got=$$RUN_VER"; \
+		echo "  ✗ claude version mismatch: real=$$REAL_VER, wrapper=$$WRAP_VER"; \
 		failed=1; \
 	fi; \
 	IMG_VER=$$(./$(BINARY) run --scratch env NO_YOLO=1 codex --version 2>/dev/null | head -1); \

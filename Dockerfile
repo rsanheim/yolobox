@@ -7,8 +7,12 @@ FROM oven/bun:1.3 AS bun-source
 # Stage: Claude Code installer
 FROM ubuntu:24.04 AS claude-installer
 
+ARG CLAUDE_CODE_VERSION=latest
+ARG CLAUDE_INSTALLER_CACHE_BUST=dev
+
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN echo "Claude Code installer cache key: ${CLAUDE_INSTALLER_CACHE_BUST}" >/dev/null \
+    && curl -fsSL https://claude.ai/install.sh | bash -s -- "${CLAUDE_CODE_VERSION}"
 
 # Main image
 FROM ubuntu:24.04
@@ -686,9 +690,11 @@ RUN mkdir -p /host-claude /host-codex /host-codex-sessions /host-gemini /host-op
     '# Ensure npm-global prefix dir exists (named volume may shadow /home/yolo)' \
     'mkdir -p /home/yolo/.npm-global' \
     '' \
-    '# Pin Claude to image version (named volume may contain an older install)' \
+    '# Seed Claude launcher only when missing or broken; user upgrades live in /home/yolo' \
     'mkdir -p /home/yolo/.local/bin' \
-    'ln -sf /usr/local/bin/claude /home/yolo/.local/bin/claude' \
+    'if [ ! -x /home/yolo/.local/bin/claude ]; then' \
+    '    ln -sf /usr/local/bin/claude /home/yolo/.local/bin/claude' \
+    'fi' \
     '' \
     '# Auto-trust project directory for Claude Code (this is yolobox after all)' \
     'if [ -n "$YOLOBOX_PROJECT_PATH" ]; then' \

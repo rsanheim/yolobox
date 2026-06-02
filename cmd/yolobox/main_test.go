@@ -1706,6 +1706,64 @@ func TestDockerfileConfiguresNpmReleaseAgeGate(t *testing.T) {
 	}
 }
 
+func TestDockerfileRefreshesClaudeInstallerOnReleaseBuilds(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read Dockerfile: %v", err)
+	}
+	dockerfile := string(data)
+
+	for _, want := range []string{
+		"ARG CLAUDE_CODE_VERSION=latest",
+		"ARG CLAUDE_INSTALLER_CACHE_BUST=dev",
+		"Claude Code installer cache key: ${CLAUDE_INSTALLER_CACHE_BUST}",
+		"curl -fsSL https://claude.ai/install.sh | bash -s -- \"${CLAUDE_CODE_VERSION}\"",
+	} {
+		if !strings.Contains(dockerfile, want) {
+			t.Fatalf("expected Dockerfile to contain %q", want)
+		}
+	}
+}
+
+func TestDockerfilePreservesUserClaudeLauncher(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read Dockerfile: %v", err)
+	}
+	dockerfile := string(data)
+
+	for _, want := range []string{
+		"Seed Claude launcher only when missing or broken; user upgrades live in /home/yolo",
+		"if [ ! -x /home/yolo/.local/bin/claude ]; then",
+		"ln -sf /usr/local/bin/claude /home/yolo/.local/bin/claude",
+		"fi",
+	} {
+		if !strings.Contains(dockerfile, want) {
+			t.Fatalf("expected Dockerfile to contain %q", want)
+		}
+	}
+	if strings.Contains(dockerfile, "Pin Claude to image version") {
+		t.Fatal("entrypoint must not pin Claude to the image version on every startup")
+	}
+}
+
+func TestReleaseWorkflowBustsClaudeInstallerCache(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "release.yml"))
+	if err != nil {
+		t.Fatalf("failed to read release workflow: %v", err)
+	}
+	workflow := string(data)
+
+	for _, want := range []string{
+		"build-args: |",
+		"CLAUDE_INSTALLER_CACHE_BUST=${{ github.ref_name }}-${{ github.sha }}",
+	} {
+		if !strings.Contains(workflow, want) {
+			t.Fatalf("expected release workflow to contain %q", want)
+		}
+	}
+}
+
 func TestDockerfileConfiguresRTK(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
 	if err != nil {

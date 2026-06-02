@@ -8,9 +8,21 @@ there is no `v0.6.0` tag in this repository.
 
 ## Unreleased
 
+## v0.18.2 - 2026-06-02
+
+### Fixed
+
+- Stopped resetting the Claude Code launcher to the image binary on every startup, so Claude self-upgrades in the persistent home volume survive later yolobox runs.
+- Refreshed the Claude Code installer layer on each release image build so new yolobox images seed from the current upstream installer instead of a stale cached layer.
+
+## v0.18.1 - 2026-05-20
+
 ### Changed
 
 - Scoped npm package release-age gating to yolobox's own base-image build installs; runtime npm/npx commands and CLI self-updates are unrestricted by default.
+
+### Added
+
 - Added `--name` / `container_name` support for assigning a runtime container name.
 
 ## v0.18.0 - 2026-05-18

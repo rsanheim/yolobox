@@ -68,6 +68,8 @@ The base image comes batteries-included:
 
 During the base image build, yolobox applies a 7-day npm release-age gate to its own npm installs. It first upgrades npm using npm's date-based `--before` filter, then runs the built-in npm/npx installs with `NPM_CONFIG_MIN_RELEASE_AGE=7` so image contents do not come from package versions published in the last week. The finished box does not keep that npm setting, so runtime npm/npx installs and CLI self-updates work normally.
 
+Bundled AI CLI versions are captured when the base image is built, but they are only a starting point. User-level npm/global installs and Claude self-upgrades live in the persistent home volume and are not reset at startup. `yolobox upgrade` refreshes the bundled defaults; it is not required just to upgrade a tool yourself.
+
 Need something else? The AI has sudo.
 
 ### AI CLIs Run in YOLO Mode
