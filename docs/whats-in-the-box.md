@@ -27,7 +27,7 @@ RTK is also preinstalled for opt-in command-output compression. Pass `--rtk` or 
 
 npm is upgraded during the image build using npm's date-based `--before` filter. yolobox's own later npm/npx installs in that image build run with `NPM_CONFIG_MIN_RELEASE_AGE=7`, but the finished box does not keep the release-age setting at runtime.
 
-Bundled AI CLI versions are captured when the base image is built, but they are only a starting point. User-level npm/global installs and Claude self-upgrades live in the persistent home volume and are not reset at startup. `yolobox upgrade` refreshes the bundled defaults; it is not required just to upgrade a tool yourself.
+Bundled AI CLI versions are captured when the base image is built, but they are only a starting point. User-level npm/global installs and Claude self-upgrades live in the persistent home volume and are not reset at startup. Use `yolobox update-agents` to refresh Claude Code, Codex, Gemini, Antigravity, OpenCode, Copilot, and Pi inside that persistent home volume. `yolobox upgrade` refreshes the bundled image defaults; it is not required just to upgrade a tool yourself.
 
 ### Build tools
 

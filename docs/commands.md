@@ -49,6 +49,8 @@ yolobox setup               # Write global defaults to ~/.config/yolobox/config.
 yolobox config              # Print the resolved config for the current project
 yolobox upgrade             # Update the binary and pull the latest base image
 yolobox upgrade --check     # Show latest release notes without upgrading
+yolobox update-agents       # Update all bundled AI CLIs in persistent home
+yolobox update-agents codex # Update one AI CLI; accepts multiple targets
 yolobox reset --force       # Remove yolobox named volumes
 yolobox uninstall --force   # Remove yolobox binary, image, and volumes
 yolobox version             # Print version and platform
@@ -138,6 +140,16 @@ yolobox upgrade --check
 ```
 
 The check prints the current version, latest version, and a short summary from the release notes without downloading a binary or pulling the image.
+
+### Update bundled AI CLIs
+
+```bash
+yolobox update-agents
+yolobox update-agents claude codex
+yolobox update-agents antigravity
+```
+
+`update-agents` runs inside the persistent yolobox home volume and refreshes Claude Code, Codex, Gemini, Antigravity, OpenCode, Copilot, and Pi. It uses global/default runtime settings, ignores `.yolobox.toml`, skips the project mount, and rejects `--scratch`, because updates made in scratch mode would disappear when the container exits.
 
 ### Reset persistent state
 

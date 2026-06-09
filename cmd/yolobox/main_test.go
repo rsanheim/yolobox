@@ -2478,6 +2478,104 @@ func TestParseUpgradeOptions(t *testing.T) {
 	}
 }
 
+func TestParseUpdateAgentTargets(t *testing.T) {
+	targets, err := parseUpdateAgentTargets(nil)
+	if err != nil {
+		t.Fatalf("parseUpdateAgentTargets(nil) failed: %v", err)
+	}
+	if !reflect.DeepEqual(targets, agentUpdateTargets) {
+		t.Fatalf("expected default targets %v, got %v", agentUpdateTargets, targets)
+	}
+
+	targets, err = parseUpdateAgentTargets([]string{"codex,antigravity", "codex"})
+	if err != nil {
+		t.Fatalf("parseUpdateAgentTargets aliases failed: %v", err)
+	}
+	if want := []string{"codex", "agy"}; !reflect.DeepEqual(targets, want) {
+		t.Fatalf("expected targets %v, got %v", want, targets)
+	}
+
+	if _, err := parseUpdateAgentTargets([]string{"not-a-tool"}); err == nil {
+		t.Fatal("expected unknown target error")
+	}
+}
+
+func TestPrepareUpdateAgentsConfigRejectsNonPersistentOrOfflineRuns(t *testing.T) {
+	if _, err := prepareUpdateAgentsConfig(Config{Scratch: true}); err == nil {
+		t.Fatal("expected --scratch rejection")
+	}
+	if _, err := prepareUpdateAgentsConfig(Config{NoNetwork: true}); err == nil {
+		t.Fatal("expected --no-network rejection")
+	}
+}
+
+func TestRunCmdArgsUpdateAgentsUsesPersistentNoProjectContainer(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+	argsFile := installFakeDockerRuntime(t)
+	defer silenceStderr(t)()
+
+	if err := runCmdArgs([]string{"update-agents", "codex", "antigravity"}, projectDir, nil); err != nil {
+		t.Fatalf("runCmdArgs update-agents failed: %v", err)
+	}
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("failed to read fake runtime args: %v", err)
+	}
+	argsText := string(data)
+	for _, want := range []string{
+		"yolobox-home:/home/yolo",
+		"\nbash\n-lc\n",
+		"targets=(\"codex\" \"agy\")",
+		"npm install -g --no-audit --no-fund \"$package@latest\"",
+		"@openai/codex",
+		"https://antigravity.google/cli/install.sh",
+		"HOME=\"$tmp_home\" bash \"$installer\" --dir \"$install_dir\"",
+	} {
+		if !strings.Contains(argsText, want) {
+			t.Fatalf("expected update-agents runtime args to contain %q, got:\n%s", want, argsText)
+		}
+	}
+	for _, unwanted := range []string{
+		"YOLOBOX_PROJECT_PATH=",
+		"\n-w\n",
+	} {
+		if strings.Contains(argsText, unwanted) {
+			t.Fatalf("did not expect update-agents runtime args to contain %q, got:\n%s", unwanted, argsText)
+		}
+	}
+}
+
+func TestUpdateAgentsIgnoresProjectConfig(t *testing.T) {
+	projectDir := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("HOME", t.TempDir())
+	argsFile := installFakeDockerRuntime(t)
+	defer silenceStderr(t)()
+
+	projectConfig := "no_network = true\nscratch = true\n[customize]\npackages = [\"cowsay\"]\n"
+	if err := os.WriteFile(filepath.Join(projectDir, ".yolobox.toml"), []byte(projectConfig), 0644); err != nil {
+		t.Fatalf("failed to write project config: %v", err)
+	}
+
+	if err := runCmdArgs([]string{"update-agents", "codex"}, projectDir, nil); err != nil {
+		t.Fatalf("update-agents should ignore project config, got: %v", err)
+	}
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("failed to read fake runtime args: %v", err)
+	}
+	argsText := string(data)
+	if !strings.Contains(argsText, "yolobox-home:/home/yolo") {
+		t.Fatalf("expected persistent home volume despite project scratch config, got:\n%s", argsText)
+	}
+}
+
 func TestPrintUpgradeCheckIncludesReleaseNotes(t *testing.T) {
 	oldVersion := Version
 	Version = "v0.17.0"

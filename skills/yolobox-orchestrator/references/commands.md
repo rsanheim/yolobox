@@ -37,6 +37,23 @@ If `default_harness` is set to a shortcut such as `codex`, bare `yolobox` launch
 yolobox shell
 ```
 
+## Updating agent CLIs
+
+Update all bundled AI CLIs in the persistent yolobox home:
+
+```bash
+yolobox update-agents
+```
+
+Target one or more tools when you do not want the full update path:
+
+```bash
+yolobox update-agents codex
+yolobox update-agents claude antigravity
+```
+
+This is a global maintenance command: it ignores `.yolobox.toml` and does not mount the current project. Do not add `--scratch`; agent updates need the persistent `yolobox-home` volume.
+
 ## Isolation controls
 
 Use a fresh home/cache state:

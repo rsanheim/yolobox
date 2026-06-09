@@ -124,8 +124,8 @@ func runCmd() error {
 	args := os.Args[1:]
 	traceTiming("host: start")
 
-	// Check for updates (skip for version/help/upgrade commands)
-	skipCheck := len(args) > 0 && (args[0] == "version" || args[0] == "help" || args[0] == "upgrade")
+	// Check for updates, except for commands that are themselves maintenance or help.
+	skipCheck := len(args) > 0 && (args[0] == "version" || args[0] == "help" || args[0] == "upgrade" || args[0] == "update-agents")
 	if !skipCheck {
 		started := time.Now()
 		checkForUpdates()
@@ -204,6 +204,8 @@ func runCmdArgs(args []string, projectDir string, fork *ForkConfig) error {
 		return err
 	case "upgrade":
 		return upgradeYolobox(args[1:])
+	case "update-agents":
+		return updateAgents(args[1:], projectDir, fork)
 	case "config":
 		cfg, rest, err := parseBaseFlags("config", args[1:], projectDir)
 		if err != nil {
@@ -299,6 +301,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  yolobox fork --name <env> <cmd>  Run in a named copied folder with Compose namespace")
 	fmt.Fprintln(os.Stderr, "  yolobox setup               Configure yolobox settings")
 	fmt.Fprintln(os.Stderr, "  yolobox upgrade [--check]   Upgrade binary/image, or inspect latest release")
+	fmt.Fprintln(os.Stderr, "  yolobox update-agents [name...]  Update bundled AI CLIs in persistent home")
 	fmt.Fprintln(os.Stderr, "  yolobox config              Print resolved configuration")
 	fmt.Fprintln(os.Stderr, "  yolobox reset --force       Remove named volumes (fresh start)")
 	fmt.Fprintln(os.Stderr, "  yolobox uninstall --force   Uninstall yolobox completely")
@@ -368,6 +371,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  yolobox shell               # Always drop into a shell")
 	fmt.Fprintln(os.Stderr, "  yolobox run make build      # Run make inside sandbox")
 	fmt.Fprintln(os.Stderr, "  yolobox fork --name bruno codex  # Developer env + Compose namespace")
+	fmt.Fprintln(os.Stderr, "  yolobox update-agents codex # Update one AI CLI in persistent home")
 	fmt.Fprintln(os.Stderr, "  yolobox run claude          # Run Claude Code in sandbox")
 	fmt.Fprintln(os.Stderr, "  yolobox --no-network        # Paranoid mode: no internet")
 	fmt.Fprintln(os.Stderr, "  yolobox --no-env-passthrough # No automatic host env vars")
@@ -384,6 +388,10 @@ func parseBaseFlags(name string, args []string, projectDir string) (Config, []st
 		return Config{}, nil, err
 	}
 
+	return parseBaseFlagsWithConfig(name, args, projectDir, cfg)
+}
+
+func parseBaseFlagsWithConfig(name string, args []string, projectDir string, cfg Config) (Config, []string, error) {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.Usage = printUsage

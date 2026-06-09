@@ -104,6 +104,7 @@ yolobox codex --rtk                   # Enable RTK command-output compression
 yolobox run --no-network make test    # Run one command with no network
 yolobox fork --name bruno codex       # Give an agent its own project copy
 yolobox upgrade                       # Update binary and pull the latest image
+yolobox update-agents                 # Update AI CLIs in the persistent box
 ```
 
 The detailed references are intentionally in the docs site:
