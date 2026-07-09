@@ -1630,13 +1630,20 @@ func buildRunArgs(cfg Config, projectDir string, command []string, interactive b
 	// pre-stage it: ~/.codex can be large, and the entrypoint sync is incremental.
 	// Sessions are mounted live so resume history stays current without copying
 	// the hottest part of the Codex tree.
+	//
+	// Honor $CODEX_HOME so a per-directory/per-project Codex home (e.g. a
+	// separate work identity) syncs into the container instead of the default
+	// ~/.codex. The container destination stays /home/yolo/.codex either way.
 	if cfg.CodexConfig {
 		started = time.Now()
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return nil, nil, err
 		}
-		codexConfigDir := filepath.Join(home, ".codex")
+		codexConfigDir := os.Getenv("CODEX_HOME")
+		if codexConfigDir == "" {
+			codexConfigDir = filepath.Join(home, ".codex")
+		}
 		if _, err := os.Stat(codexConfigDir); err == nil {
 			args = append(args, "-v", codexConfigDir+":/host-codex/.codex:ro")
 			codexSessionsDir := filepath.Join(codexConfigDir, "sessions")

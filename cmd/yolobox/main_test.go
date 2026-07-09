@@ -1481,6 +1481,7 @@ func TestBuildRunArgsReadonlyProject(t *testing.T) {
 func TestBuildRunArgsCodexConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "") // ignore any inherited split-home override
 
 	codexConfigDir := filepath.Join(home, ".codex")
 	if err := os.MkdirAll(codexConfigDir, 0755); err != nil {
@@ -1520,6 +1521,49 @@ func TestBuildRunArgsCodexConfig(t *testing.T) {
 	}
 	if len(cleanupPaths) != 0 {
 		t.Fatalf("expected codex config to mount directly without staging, got cleanup paths %v", cleanupPaths)
+	}
+}
+
+func TestBuildRunArgsCodexConfigHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	// A separate Codex home (e.g. a work identity) selected via $CODEX_HOME.
+	codexHome := filepath.Join(t.TempDir(), ".codex-dox")
+	sessionsDir := filepath.Join(codexHome, "sessions")
+	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
+		t.Fatalf("failed to create codex home: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("model = \"gpt-5\"\n"), 0644); err != nil {
+		t.Fatalf("failed to write codex config file: %v", err)
+	}
+	t.Setenv("CODEX_HOME", codexHome)
+
+	// The default ~/.codex must be ignored in favor of $CODEX_HOME.
+	defaultCodex := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(defaultCodex, 0755); err != nil {
+		t.Fatalf("failed to create default codex dir: %v", err)
+	}
+
+	cfg := Config{
+		Image:       "test-image",
+		CodexConfig: true,
+	}
+
+	args, _, err := buildRunArgs(cfg, "/test/project", []string{"bash"}, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	argsStr := strings.Join(args, " ")
+	if !strings.Contains(argsStr, codexHome+":/host-codex/.codex:ro") {
+		t.Fatalf("expected $CODEX_HOME to be mounted, got %s", argsStr)
+	}
+	if !strings.Contains(argsStr, sessionsDir+":/host-codex-sessions:rw") {
+		t.Fatalf("expected $CODEX_HOME sessions live mount, got %s", argsStr)
+	}
+	if strings.Contains(argsStr, defaultCodex+":/host-codex/.codex:ro") {
+		t.Fatalf("default ~/.codex should be ignored when $CODEX_HOME is set, got %s", argsStr)
 	}
 }
 
